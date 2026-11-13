@@ -207,7 +207,7 @@ import { FakeEventSource } from '@neuron-core/iq-stream/client/testing';
 
 ## Requirements
 
-- Node 20.19 or later for the publisher (the first releases that load ES modules through `require()`, for code that is CommonJS). The export map sends Bun and Deno to the same build, and Cloudflare Workers and edge runtimes to the `fetch` build. The tests run on Node 22 and in Next.js's Node.js and Edge runtimes; the other runtimes are not tested yet.
+- Node 20.19 or later for the publisher (the first releases that load ES modules through `require()`, for code that is CommonJS). The export map sends Bun and Deno to the same build, and Cloudflare Workers and edge runtimes to the `fetch` build. The tests run on Node 20, 22 and 24 and in Next.js's Node.js and Edge runtimes; Bun, Deno and Workers are not tested yet.
 - An IQ-Stream server 1.x.
 - For the bridges: `ai` 5 or later (tested with 7); `@ag-ui/client` 1 or later with `rxjs` 7.
 

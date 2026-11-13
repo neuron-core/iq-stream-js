@@ -10,7 +10,7 @@ Adapters for agent frameworks (LangChain, Mastra) will be added as further packa
 
 ## Development
 
-Node 22 and Docker.
+Node 20.19 or later and Docker.
 
 ```sh
 npm install
@@ -27,6 +27,8 @@ npm run test:integration  # publisher and client against the servers
 npm run test:browser      # the client in Chromium (npx playwright install chromium, once)
 npm run servers:stop
 ```
+
+CI pulls that image with the workflow's own token, so the package on GitHub must give this repository read access (its settings, "Manage Actions access"), or be public.
 
 To use servers that run elsewhere, set `IQ_STREAM_TEST_URL` and `IQ_STREAM_TEST_SHORT_URL`; the short one needs the settings of `SHORT_SETTINGS` in `packages/iq-stream/src/testing/index.ts`.
 

@@ -70,7 +70,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - run: docker pull "$IQ_STREAM_TEST_IMAGE"
+      - name: Pull the server image
+        run: |
+          docker pull "$IQ_STREAM_TEST_IMAGE" || {
+            echo "::error::Cannot pull $IQ_STREAM_TEST_IMAGE. Give this repository read access to the package (its settings on GitHub, 'Manage Actions access'), or make the image public."
+            exit 1
+          }
       - run: npm ci
       - run: npm run build
       - run: npm run servers:start
@@ -93,7 +98,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - run: docker pull "$IQ_STREAM_TEST_IMAGE"
+      - name: Pull the server image
+        run: |
+          docker pull "$IQ_STREAM_TEST_IMAGE" || {
+            echo "::error::Cannot pull $IQ_STREAM_TEST_IMAGE. Give this repository read access to the package (its settings on GitHub, 'Manage Actions access'), or make the image public."
+            exit 1
+          }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build

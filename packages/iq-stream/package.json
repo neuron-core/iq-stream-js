@@ -57,10 +57,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && npm run test:unit",
-    "test:unit": "node --test \"test/unit/**/*.test.mjs\"",
-    "test:packaging": "node --test --test-concurrency=1 \"test/packaging/*.test.mjs\"",
-    "test:integration": "node --test --test-concurrency=1 \"test/integration/**/*.test.mjs\"",
-    "test:browser": "node --test --test-concurrency=1 \"test/browser/*.test.mjs\"",
+    "test:unit": "node test/run.mjs test/unit",
+    "test:packaging": "node test/run.mjs test/packaging --test-concurrency=1",
+    "test:integration": "node test/run.mjs test/integration --test-concurrency=1",
+    "test:browser": "node test/run.mjs test/browser --test-concurrency=1",
     "servers:start": "node test/servers.mjs start",
     "servers:stop": "node test/servers.mjs stop",
     "prepublishOnly": "npm run build && npm run test:unit && npm run test:packaging"
