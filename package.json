@@ -1,0 +1,16 @@
+{
+  "name": "iq-stream-js",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:unit": "npm run test:unit --workspaces --if-present",
+    "test:packaging": "npm run test:packaging --workspaces --if-present",
+    "test:integration": "npm run test:integration --workspaces --if-present",
+    "test:browser": "npm run test:browser --workspaces --if-present",
+    "servers:start": "npm run servers:start --workspaces --if-present",
+    "servers:stop": "npm run servers:stop --workspaces --if-present"
+  }
+}

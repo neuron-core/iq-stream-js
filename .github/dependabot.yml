@@ -1,0 +1,20 @@
+# Dependabot checks what this repository depends on once a month. A release must be at least 5 days
+# old before it is proposed, which leaves time for a broken or compromised version to be caught and
+# pulled first. The cooldown does not delay security updates.
+version: 2
+updates:
+  # Development dependencies: the package itself has no runtime dependency.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 5
+
+  # The actions used by the CI workflow, each pinned to a commit.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 5

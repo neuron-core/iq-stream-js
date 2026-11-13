@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.next/
+*.tgz
+*.tsbuildinfo
+.DS_Store
+# output of the packaging tests
+packages/*/test/packaging/.out/
+packages/*/test/.servers.json

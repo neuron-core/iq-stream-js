@@ -1,0 +1,109 @@
+{
+  "name": "@neuron-core/iq-stream",
+  "version": "0.1.0",
+  "description": "Publisher and browser client for the IQ-Stream server: relay an agent's answer to browsers over Server-Sent Events",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neuron-core/iq-stream-js.git",
+    "directory": "packages/iq-stream"
+  },
+  "homepage": "https://github.com/neuron-core/iq-stream-js",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.19"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/publisher/index.d.ts",
+      "workerd": "./dist/publisher/fetch.js",
+      "edge-light": "./dist/publisher/fetch.js",
+      "browser": "./dist/browser.js",
+      "deno": "./dist/publisher/node.js",
+      "bun": "./dist/publisher/node.js",
+      "node": "./dist/publisher/node.js",
+      "default": "./dist/publisher/fetch.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./fetch": {
+      "types": "./dist/fetch/index.d.ts",
+      "default": "./dist/fetch/index.js"
+    },
+    "./ai-sdk": {
+      "types": "./dist/ai-sdk/index.d.ts",
+      "default": "./dist/ai-sdk/index.js"
+    },
+    "./ag-ui": {
+      "types": "./dist/ag-ui/index.d.ts",
+      "default": "./dist/ag-ui/index.js"
+    },
+    "./client/testing": {
+      "types": "./dist/client/testing.d.ts",
+      "default": "./dist/client/testing.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "node": "./dist/testing/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && npm run test:unit",
+    "test:unit": "node --test \"test/unit/**/*.test.mjs\"",
+    "test:packaging": "node --test --test-concurrency=1 \"test/packaging/*.test.mjs\"",
+    "test:integration": "node --test --test-concurrency=1 \"test/integration/**/*.test.mjs\"",
+    "test:browser": "node --test --test-concurrency=1 \"test/browser/*.test.mjs\"",
+    "servers:start": "node test/servers.mjs start",
+    "servers:stop": "node test/servers.mjs stop",
+    "prepublishOnly": "npm run build && npm run test:unit && npm run test:packaging"
+  },
+  "peerDependencies": {
+    "@ag-ui/client": ">=1",
+    "ai": ">=5",
+    "rxjs": ">=7"
+  },
+  "peerDependenciesMeta": {
+    "@ag-ui/client": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
+    },
+    "rxjs": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "devDependencies": {
+    "@ag-ui/client": "1.0.4",
+    "@ag-ui/core": "1.0.4",
+    "@ai-sdk/react": "4.0.176",
+    "@arethetypeswrong/cli": "0.18.5",
+    "@neuron-core/streaming": "0.3.0",
+    "@rollup/plugin-node-resolve": "16.0.3",
+    "@types/node": "26.6.6",
+    "ai": "7.0.172",
+    "esbuild": "0.28.2",
+    "eventsource": "5.1.5",
+    "playwright": "1.63.0",
+    "publint": "0.3.25",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "rollup": "4.68.3",
+    "rxjs": "7.8.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "webpack": "5.112.2"
+  }
+}
