@@ -12,7 +12,7 @@ The two adapters are thin layers over the publisher of `@neuron-core/iq-stream`,
 
 ## Development
 
-Node 20.19 or later and Docker.
+Node 20.19 or later and Docker. Mastra itself asks for Node 22.13, so use that to work on its adapter.
 
 ```sh
 npm install
@@ -65,7 +65,7 @@ Three rules keep the two sides of the package apart, and `test/unit/boundaries.t
 
 ### Releasing
 
-Each package is released by itself. For `@neuron-core/iq-stream`, `prepublishOnly` builds and runs the unit and packaging tests, so a package whose export map would send a browser to the publisher cannot be published. An adapter's `prepublishOnly` builds the whole workspace first, since it compiles against the core's built output, and runs its own unit tests. When an adapter needs a newer core, release the core first and raise the adapter's peer range.
+Each package is released by itself. For `@neuron-core/iq-stream`, `prepublishOnly` builds and runs the unit and packaging tests, so a package whose export map would send a browser to the publisher cannot be published. An adapter's `prepublishOnly` builds the core first, since it compiles against the core's built output, then builds itself and runs its own unit tests. When an adapter needs a newer core, release the core first and raise the adapter's peer range.
 
 Releases go out from GitHub Actions (`.github/workflows/release.yml`) when a tag `<package>@<version>` is pushed:
 

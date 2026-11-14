@@ -38,7 +38,7 @@
     "test:unit": "node ../../scripts/run-tests.mjs test/unit",
     "test:integration": "node ../../scripts/run-tests.mjs test/integration --test-concurrency=1",
     "test:browser": "node ../../scripts/run-tests.mjs test/browser --test-concurrency=1",
-    "prepublishOnly": "npm run build && npm run test:unit"
+    "prepublishOnly": "npm run build --prefix ../iq-stream && npm run build && npm run test:unit"
   },
   "peerDependencies": {
     "@ai-sdk/langchain": ">=3",

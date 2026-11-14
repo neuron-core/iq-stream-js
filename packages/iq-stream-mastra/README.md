@@ -189,7 +189,8 @@ Every publish function and the route take these:
 ## Requirements
 
 - `@mastra/core` 1.83 or later and `@mastra/ai-sdk` 1.12 or later, of the 1.x line. The tests run on exactly these versions, with `@ag-ui/mastra` 2.0.2 and `ai` 7.
-- `@neuron-core/iq-stream` 0.1 and what it requires: Node 20.19 or later, an IQ-Stream server 1.x.
+- Node 22.13 or later, which is what Mastra requires.
+- `@neuron-core/iq-stream` 0.1 and an IQ-Stream server 1.x.
 - ES modules only.
 
 Not covered by tests: durable and evented agents, agent networks, sub-agent delegation, serverless and edge runtimes, and a shared `serverCache`.
