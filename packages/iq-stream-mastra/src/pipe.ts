@@ -8,6 +8,8 @@ export interface PipeOptions<T> {
   /** What a chunk says about the ending. Without it every leg that ends closes with `end`. */
   classify?: (chunk: T) => ChunkKind;
   oversize?: Oversize;
+  /** What `oversize: 'omit'` sends in place of a chunk. Default: a transient `data-iq-omitted` part of the AI SDK. */
+  placeholder?: (chunk: T, bytes: number) => unknown;
   closeOnCancel?: 'fail' | 'end';
   suspendGraceMs?: number;
 }
@@ -37,8 +39,8 @@ function within<V>(read: Promise<V>, ms: number): Promise<V | typeof SILENT> {
   return Promise.race([read, silence]).finally(() => clearTimeout(timer));
 }
 
-/** What stands in for a chunk that is too large: a transient data part, which `useChat` hands to `onData` and does not store. */
-function placeholder(chunk: unknown, bytes: number): unknown {
+/** A transient data part, which `useChat` hands to `onData` and does not store in the message. */
+function omittedPart(chunk: unknown, bytes: number): unknown {
   const { type, toolCallId } = (chunk ?? {}) as { type?: unknown; toolCallId?: unknown };
   return { type: 'data-iq-omitted', transient: true, data: { type, ...(toolCallId === undefined ? {} : { toolCallId }), bytes } };
 }
@@ -49,7 +51,7 @@ function placeholder(chunk: unknown, bytes: number): unknown {
  * so the agent finishes and saves. Never rejects.
  */
 export async function pipeToIQ<T>(source: ChunkSource<T>, publisher: Publisher, options: PipeOptions<T> = {}): Promise<RunPublishResult> {
-  const { classify, oversize = 'omit', closeOnCancel = 'fail', suspendGraceMs = 1000 } = options;
+  const { classify, oversize = 'omit', placeholder = omittedPart, closeOnCancel = 'fail', suspendGraceMs = 1000 } = options;
   const serialize = options.serialize ?? (JSON.stringify as (chunk: T) => string);
   let cause: RunPublishResult['cause'];
   let suspended = false;
@@ -104,7 +106,8 @@ export async function pipeToIQ<T>(source: ChunkSource<T>, publisher: Publisher, 
       publish(chunk);
     }
   } catch (thrown) {
-    cause = 'stream-error';
+    // A source that breaks after its own error chunk has already said why.
+    if (cause !== 'error') cause = 'stream-error';
     error = thrown;
   }
 

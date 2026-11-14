@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { IQError } from '@neuron-core/iq-stream';
 import { RecordingPublisher } from '@neuron-core/iq-stream/testing';
-import { classifyMastraChunk, classifyUIChunk, pipeToIQ } from '../../dist/index.js';
+import { classifyAgUiEvent, classifyMastraChunk, classifyUIChunk, pipeToIQ } from '../../dist/index.js';
 
 const streamOf = (chunks) => new ReadableStream({
   start(controller) {
@@ -77,6 +77,17 @@ test('a source that errors closes with fail and cause stream-error; the frames b
   assert.equal(publisher.framesSent, 2);
   assert.equal(publisher.outcome, 'fail');
   assert.deepEqual([result.outcome, result.cause, result.error], ['fail', 'stream-error', boom]);
+});
+
+test('a source that breaks after its own error chunk keeps cause error', async () => {
+  const publisher = new RecordingPublisher();
+  const boom = new Error('and then the stream broke');
+  const source = (async function* () {
+    yield { type: 'RUN_ERROR', message: 'x' };
+    throw boom;
+  })();
+  const result = await pipeToIQ(source, publisher, { classify: classifyAgUiEvent });
+  assert.deepEqual([result.outcome, result.cause, result.error, publisher.framesSent], ['fail', 'error', boom, 1]);
 });
 
 test('a source that cannot be read at all still resolves', async () => {
@@ -167,6 +178,14 @@ test('oversize: drop leaves the chunk out, a function sends what it returns', as
     assert.deepEqual(sent(publisher), [text('b')]);
     assert.deepEqual([result.outcome, result.framesSent, result.framesOmitted], ['end', 1, 1]);
   }
+});
+
+test('oversize: omit sends the placeholder the protocol asks for', async () => {
+  const publisher = new RecordingPublisher({ maxFrameBytes: 200 });
+  const big = { type: 'BIG', value: 'x'.repeat(300) };
+  const result = await pipeToIQ(streamOf([big]), publisher, { placeholder: (chunk, bytes) => ({ type: 'CUSTOM', was: chunk.type, bytes }) });
+  assert.deepEqual(sent(publisher), [{ type: 'CUSTOM', was: 'BIG', bytes: publisher.frameSize(JSON.stringify(big)) }]);
+  assert.deepEqual([result.framesSent, result.framesOmitted], [1, 1]);
 });
 
 test('oversize follows the publisher\'s own limit', async () => {

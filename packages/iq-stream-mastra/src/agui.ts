@@ -1,6 +1,6 @@
 import { classifyAgUiEvent } from './classify.js';
 import { startPublishing } from './publish.js';
-import type { Oversize, PublishOptions, PublishedRun } from './types.js';
+import type { PublishOptions, PublishedRun } from './types.js';
 
 /** An rxjs `Observable`, by the one method the adapter calls: no dependency on rxjs. */
 export interface ObservableLike<T = unknown> {
@@ -8,7 +8,7 @@ export interface ObservableLike<T = unknown> {
 }
 
 /** The AG-UI counterpart of the `data-iq-omitted` part: a custom event with the same content. */
-const omitted: Oversize = (event, bytes) => {
+const omittedEvent = (event: unknown, bytes: number): unknown => {
   const { type, toolCallId } = (event ?? {}) as { type?: unknown; toolCallId?: unknown };
   return { type: 'CUSTOM', name: 'iq-omitted', value: { type, ...(toolCallId === undefined ? {} : { toolCallId }), bytes } };
 };
@@ -51,6 +51,5 @@ export function publishAgUi(events: ObservableLike, options: PublishOptions): Pr
       controller.enqueue({ type: 'RUN_ERROR', message: 'The run was aborted.', code: 'abort' });
       controller.close();
     });
-  const oversize = options.oversize === undefined || options.oversize === 'omit' ? omitted : options.oversize;
-  return startPublishing(stream, { ...options, oversize }, { classify: classifyAgUiEvent }, { abort });
+  return startPublishing(stream, options, { classify: classifyAgUiEvent, placeholder: omittedEvent }, { abort });
 }
