@@ -18,7 +18,7 @@ const omittedEvent = (event: unknown, bytes: number): unknown => {
  * unsubscribes, which is how that bridge cancels its run, and ends the stream as an `HttpAgent` ends an
  * aborted one: with a `RUN_ERROR` whose code is `abort`.
  */
-export function publishAgUi(events: ObservableLike, options: PublishOptions): Promise<PublishedRun> {
+export async function publishAgUi(events: ObservableLike, options: PublishOptions): Promise<PublishedRun> {
   let subscription: { unsubscribe(): void } | undefined;
   let controller!: ReadableStreamDefaultController<unknown>;
   let over = false;

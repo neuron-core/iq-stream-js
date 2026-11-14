@@ -41,12 +41,7 @@ export async function startPublishing<T>(
     void drain(source);
     throw error;
   }
-  const done = pipeToIQ(source, publisher, {
-    ...pipe,
-    ...(closeOnCancel === undefined ? {} : { closeOnCancel }),
-    ...(oversize === undefined ? {} : { oversize }),
-    ...(suspendGraceMs === undefined ? {} : { suspendGraceMs }),
-  }).then((result) => {
+  const done = pipeToIQ(source, publisher, { ...pipe, closeOnCancel, oversize, suspendGraceMs }).then((result) => {
     try {
       onResult?.(result, ticket);
     } catch {
@@ -65,7 +60,7 @@ export async function startPublishing<T>(
  */
 export function publishUIMessageStream(
   stream: ChunkSource,
-  options: PublishOptions & { runId?: string; abort?: (reason?: unknown) => void },
+  options: PublishOptions & { runId?: string | undefined; abort?: ((reason?: unknown) => void) | undefined },
 ): Promise<PublishedRun> {
   return startPublishing(stream, options, { classify: classifyUIChunk }, { runId: options.runId, abort: options.abort });
 }
@@ -109,5 +104,5 @@ export function publishToIQ(source: MastraSource, options: PublishToIQOptions): 
   const convert = toAISdkStream as unknown as (stream: unknown, options: object) => ReadableStream<unknown>;
   const stream = convert(result, { onError: maskedError, ...ui, from: from ?? detected, version });
   const runId = (result as { runId?: unknown }).runId;
-  return publishUIMessageStream(stream, { ...publish, ...(typeof runId === 'string' ? { runId } : {}) });
+  return publishUIMessageStream(stream, { ...publish, runId: typeof runId === 'string' ? runId : undefined });
 }

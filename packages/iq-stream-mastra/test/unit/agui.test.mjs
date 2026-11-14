@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { MastraAgent } from '@ag-ui/mastra';
 import { publishAgUi } from '../../dist/index.js';
-import { ANSWER, QUESTION, types, weatherAgent } from '../support/agent.mjs';
+import { ANSWER, QUESTION, sleep, types, weatherAgent } from '../support/agent.mjs';
 import { recordingClient } from '../support/client.mjs';
 
 const input = { threadId: 'thread-1', runId: 'run-1', messages: [{ id: 'u1', role: 'user', content: QUESTION }], tools: [], context: [], state: {}, forwardedProps: {} };
@@ -78,15 +78,25 @@ test('abort() unsubscribes, which cancels the run, and ends the stream with RUN_
   }
 });
 
-test('abort() cancels a real run of @ag-ui/mastra', async () => {
+test('abort() cancels a real run of @ag-ui/mastra: the model is not called for the second step', async () => {
   const { iq, publishers } = recordingClient();
-  const mastraAgent = weatherAgent({ pace: 40 });
+  let calls = 0;
+  const mastraAgent = weatherAgent({ pace: 40, onCall: () => calls++ });
   const run = await publishAgUi(new MastraAgent({ agentId: 'weather', agent: mastraAgent, resourceId: 'user-1' }).run(input), { iq });
   setTimeout(() => run.abort(), 100);
   const result = await run.done;
   assert.deepEqual(events(publishers[0]).at(-1), { type: 'RUN_ERROR', message: 'The run was aborted.', code: 'abort' });
   assert.ok(!types(publishers[0]).includes('RUN_FINISHED'));
   assert.deepEqual([result.outcome, result.cause], ['fail', 'abort']);
+  // Left alone, the first step would end after 400 ms and the second begin.
+  await sleep(800);
+  assert.equal(calls, 1);
+});
+
+test('an Observable that throws while subscribing rejects, and opens nothing', async () => {
+  const { iq, publishers } = recordingClient();
+  await assert.rejects(publishAgUi({ subscribe() { throw new Error('no bridge'); } }, { iq }), /no bridge/);
+  assert.equal(publishers.length, 0);
 });
 
 test('an event over the frame limit becomes a CUSTOM iq-omitted event', async () => {

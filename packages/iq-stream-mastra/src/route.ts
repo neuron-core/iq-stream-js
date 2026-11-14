@@ -46,7 +46,8 @@ const ACTIVE_RUN_TTL_MS = 35 * 60 * 1000;
  * as the answer: do not take them out of it.
  */
 export function iqChatRoute(options: IQChatRouteOptions): ApiRoute[] {
-  const { path, agent, reconnect = true, iq, subTokenTtl, closeOnCancel, oversize, suspendGraceMs, waitUntil, onResult, ...chat } = options;
+  const { path, agent, reconnect = true, ...chat } = options;
+  const { iq, subTokenTtl, defaultOptions } = chat;
   if (!agent && !path.includes('/:agentId')) {
     throw new Error('iqChatRoute: the path must contain :agentId, or `agent` must name the agent.');
   }
@@ -73,18 +74,11 @@ export function iqChatRoute(options: IQChatRouteOptions): ApiRoute[] {
       // Refused here, by name: a throw would reach the browser as the server's anonymous 500.
       if (!agentId || !knows(mastra, agentId)) return c.json({ error: `Agent ${agentId ?? ''} not found.` }, 404);
       if (!Array.isArray(body?.messages)) return c.json({ error: 'The body must carry the messages of useChat.' }, 400);
-      const trusted: RequestContext | undefined = c.get('requestContext') ?? chat.defaultOptions?.requestContext;
+      const trusted: RequestContext | undefined = c.get('requestContext') ?? defaultOptions?.requestContext;
 
       // A throw here is the server's to answer, as for any route; no stream was opened.
       const run = await publishChat({
         ...chat,
-        iq,
-        ...(subTokenTtl === undefined ? {} : { subTokenTtl }),
-        ...(closeOnCancel === undefined ? {} : { closeOnCancel }),
-        ...(oversize === undefined ? {} : { oversize }),
-        ...(suspendGraceMs === undefined ? {} : { suspendGraceMs }),
-        ...(waitUntil === undefined ? {} : { waitUntil }),
-        ...(onResult === undefined ? {} : { onResult }),
         mastra,
         agentId,
         params: {
@@ -137,7 +131,7 @@ export function iqChatRoute(options: IQChatRouteOptions): ApiRoute[] {
     handler: async (c) => {
       const agentId = agent ?? c.req.param('agentId');
       const chatId = c.req.param('chatId');
-      const trusted: RequestContext | undefined = c.get('requestContext') ?? chat.defaultOptions?.requestContext;
+      const trusted: RequestContext | undefined = c.get('requestContext') ?? defaultOptions?.requestContext;
       let active: ActiveRun | undefined;
       if (agentId && chatId) {
         active = (await c.get('mastra').serverCache.get(chatKey(agentId, chatId, trusted)).catch(() => undefined)) as ActiveRun | undefined;

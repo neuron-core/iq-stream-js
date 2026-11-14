@@ -8,4 +8,5 @@ export type { PublishChatOptions } from './chat.js';
 export { iqChatRoute } from './route.js';
 export type { IQChatRouteOptions } from './route.js';
 export { publishAgUi } from './agui.js';
+export type { ObservableLike } from './agui.js';
 export type { ChunkKind, ChunkSource, IQTicket, Oversize, PublishOptions, PublishedRun, RunPublishResult, UIVersion } from './types.js';

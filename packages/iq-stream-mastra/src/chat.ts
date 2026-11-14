@@ -47,14 +47,7 @@ export async function publishChat(options: PublishChatOptions): Promise<Publishe
     params: { ...chat.params, runId, abortSignal: given ? AbortSignal.any([given, controller.signal]) : controller.signal },
   });
   return publishUIMessageStream(stream, {
-    iq,
-    ...(streamId === undefined ? {} : { streamId }),
-    ...(subTokenTtl === undefined ? {} : { subTokenTtl }),
-    ...(closeOnCancel === undefined ? {} : { closeOnCancel }),
-    ...(oversize === undefined ? {} : { oversize }),
-    ...(suspendGraceMs === undefined ? {} : { suspendGraceMs }),
-    ...(waitUntil === undefined ? {} : { waitUntil }),
-    ...(onResult === undefined ? {} : { onResult }),
+    iq, streamId, subTokenTtl, closeOnCancel, oversize, suspendGraceMs, waitUntil, onResult,
     runId: resumedRunId(chat) ?? runId,
     abort: (reason) => controller.abort(reason),
   });

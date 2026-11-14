@@ -20,10 +20,12 @@ const result = (stream) => ({ rawCall: { rawPrompt: null, rawSettings: {} }, war
  * `fail` breaks the answer after three words, as a provider outage does. `tool: false` answers at once.
  * `pace` is the delay between two chunks of the model, in milliseconds. The model keeps no state: it
  * calls the tool until the prompt holds a tool result, so one agent serves any number of runs.
+ * `onCall` is told of every call.
  */
-export function mockModel({ fail = false, tool = true, pace = 5 } = {}) {
+export function mockModel({ fail = false, tool = true, pace = 5, onCall } = {}) {
   return new MastraLanguageModelV2Mock({
     doStream: async ({ prompt }) => {
+      onCall?.();
       if (tool && !prompt.some((message) => message.role === 'tool')) {
         return result(simulateReadableStream({
           chunkDelayInMs: pace,
