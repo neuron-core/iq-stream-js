@@ -83,6 +83,8 @@ export class FakeTransport {
   requests = [];
   /** The bodies of the short requests: '' is a probe. */
   posts = [];
+  /** The timeout each short request was given, in milliseconds. */
+  timeouts = [];
   /** Called with each request as it opens, to answer it at once. */
   onOpen = undefined;
   /** Answers each short request. By default the stream is empty and open, and a close line is accepted. */
@@ -98,9 +100,10 @@ export class FakeTransport {
     return request;
   }
 
-  async post(streamId, token, body) {
+  async post(streamId, token, body, timeoutMs) {
     const text = decoder.decode(body);
     this.posts.push(text);
+    this.timeouts.push(timeoutMs);
     return this.onPost(text, this.posts.length - 1);
   }
 

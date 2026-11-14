@@ -189,6 +189,22 @@ test('stop is called with the ticket when the user aborts', async () => {
   assert.deepEqual(describe(chat), { status: 'ready', error: null, text: 'Ciao da Napoli.' });
 });
 
+test('stop is called when the user aborts while start() is still running', async () => {
+  const stopped = [];
+  const controller = new AbortController();
+  let release;
+  const transport = chatTransport({
+    start: () => new Promise((resolve) => { release = resolve; }),
+    stop: (ticket) => stopped.push(ticket),
+    open: () => scripted(TEXT, 'never'),
+  });
+  const sending = transport.sendMessages({ ...request, abortSignal: controller.signal });
+  controller.abort();
+  release({ streamId: 'stream-1' });
+  await (await sending).cancel();
+  assert.deepEqual(stopped, [{ streamId: 'stream-1' }]);
+});
+
 test('stop is not called for a run that finished, nor when the reader cancels', async () => {
   const stopped = [];
   const controller = new AbortController();

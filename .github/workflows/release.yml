@@ -1,0 +1,72 @@
+name: Release
+
+# Publishes one package of the workspace to npm when a tag `<package>@<version>` is pushed: `iq-stream@0.1.1`
+# publishes packages/iq-stream at 0.1.1. The whole of CI runs first, integration and browser tests included.
+# npm authenticates this workflow by trusted publishing (OIDC), so no npm token is stored in the repository.
+
+on:
+  push:
+    tags: ['*@[0-9]*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Fails at once when the tag names no package, or a version its package.json does not have.
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.check.outputs.package }}
+      dist-tag: ${{ steps.check.outputs.dist-tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: check
+        run: |
+          name="${GITHUB_REF_NAME%@*}"
+          version="${GITHUB_REF_NAME##*@}"
+          manifest="packages/$name/package.json"
+          if [ ! -f "$manifest" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME names no package: there is no $manifest."
+            exit 1
+          fi
+          actual=$(node -p 'require(process.argv[1]).version' "./$manifest")
+          if [ "$actual" != "$version" ]; then
+            echo "::error::The tag says $version, but $manifest says $actual."
+            exit 1
+          fi
+          echo "package=packages/$name" >> "$GITHUB_OUTPUT"
+          # A prerelease (0.2.0-beta.1) must not become the version `npm install` picks.
+          if [[ "$version" == *-* ]]; then echo "dist-tag=next" >> "$GITHUB_OUTPUT"; else echo "dist-tag=latest" >> "$GITHUB_OUTPUT"; fi
+
+  ci:
+    needs: tag
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      packages: read
+
+  publish:
+    needs: [tag, ci]
+    runs-on: ubuntu-latest
+    # Add required reviewers to this environment (repository settings, Environments) to approve each release.
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # trusted publishing, and the provenance statement
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Node 24 ships npm 11.5.1 or later, which trusted publishing needs. No registry-url: an .npmrc with a
+      # token placeholder only gets in the way of OIDC. No npm cache in the job that publishes.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci
+      # prepublishOnly builds the package and runs its unit and packaging tests on this tree once more.
+      - run: npm publish --workspace "$PACKAGE" --tag "$DIST_TAG"
+        env:
+          PACKAGE: ${{ needs.tag.outputs.package }}
+          DIST_TAG: ${{ needs.tag.outputs.dist-tag }}

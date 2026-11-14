@@ -63,6 +63,20 @@ Three rules keep the two sides of the package apart, and `test/unit/boundaries.t
 
 A release publishes `@neuron-core/iq-stream` from `packages/iq-stream`. `prepublishOnly` builds and runs the unit and packaging tests, so a package whose export map would send a browser to the publisher cannot be published.
 
+Releases go out from GitHub Actions (`.github/workflows/release.yml`) when a tag `<package>@<version>` is pushed:
+
+```sh
+npm version patch -w packages/iq-stream   # in a workspace, npm neither commits nor tags
+git commit -am "iq-stream 0.1.1"
+git tag iq-stream@0.1.1
+git push origin main iq-stream@0.1.1
+```
+
+The workflow checks the tag against the package's `package.json`, runs the whole of CI, and publishes with provenance. A version with a hyphen (`0.2.0-beta.1`) goes out under the `next` dist-tag. The workflow authenticates by npm's trusted publishing, which can be configured only for a package that already exists. So, once per package:
+
+1. Publish the first version by hand, without provenance, which only CI can generate: `npm publish -w packages/iq-stream --provenance=false`.
+2. On npmjs.com, in the package's settings under Trusted publishing, add GitHub Actions: organization `neuron-core`, repository `iq-stream-js`, workflow `release.yml`, environment `npm`.
+
 ## License
 
 MIT

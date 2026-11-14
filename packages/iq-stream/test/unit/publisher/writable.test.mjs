@@ -94,6 +94,25 @@ test('backpressure: a write waits until the writer has taken the line', async ()
   await writer.close();
 });
 
+test('batch mode: lines piped through writable() share a request', async () => {
+  const { transport, publisher } = setup({ mode: 'batch', batchMs: 100 });
+  let held = 0;
+  transport.onPost = (body) => {
+    held += body.split('\n').filter((line) => line.startsWith('{"data"')).length;
+    return { status: 200, body: body.includes('"close"') ? { lastEventId: held, closed: true, outcome: 'end' } : { lastEventId: held, closed: false } };
+  };
+  const pub = publisher();
+  const source = new ReadableStream({
+    start(controller) {
+      for (let i = 0; i < 20; i++) controller.enqueue(`frame ${i}`);
+      controller.close();
+    },
+  });
+  await source.pipeTo(pub.writable());
+  assert.equal(held, 20);
+  assert.ok(transport.posts.length <= 3, `${transport.posts.length} requests for 20 lines`);
+});
+
 test('a publisher that gave up drains a pipe without failing it', async () => {
   const { transport, publisher, errors } = setup();
   const pub = publisher();

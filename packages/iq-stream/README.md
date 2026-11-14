@@ -174,12 +174,15 @@ const agent = new StreamAgent({
   threadId,
   start: async (input) =>
     (await fetch('/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })).json(),
+  stop: (ticket) => void fetch(`/agent/stop/${ticket.streamId}`, { method: 'POST' }),
 });
 
 await agent.runAgent();
 ```
 
 `StreamAgent` extends `AbstractAgent` from `@ag-ui/client`, so CopilotKit and other AG-UI front ends take it where they take an `HttpAgent`. `@ag-ui/client` and `rxjs` are peer dependencies of this entry point only.
+
+`agent.abortRun()` ends the run as `HttpAgent` does, with a `RUN_ERROR` whose code is `abort`, and calls `stop` so that your backend cancels it. An abort that comes while `start` is still waiting calls `stop` as soon as the ticket arrives.
 
 Both bridges treat a failed or cancelled run the same way: the protocol's own event (`error`, `abort`, `RUN_ERROR`) already told the SDK, so the `iq:fail` that follows is not reported a second time.
 

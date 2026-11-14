@@ -139,6 +139,41 @@ test('unsubscribing before the ticket arrives opens no stream', async () => {
   assert.equal(opened, 0);
 });
 
+test('abortRun() ends the run with RUN_ERROR abort, cancels the reader and asks the application to stop it', async () => {
+  let cancelled = 0;
+  const stopped = [];
+  const agent = new StreamAgent({
+    threadId: 'thread-1',
+    start: async () => ({ streamId: 'stream-1' }),
+    stop: (ticket) => stopped.push(ticket),
+    open: () => scripted(STARTED, 'never', () => { cancelled++; }),
+  });
+  const seen = [];
+  const run = agent.runAgent({}, { onEvent: ({ event }) => { seen.push(event.type); } });
+  while (seen.length < 3) await tick();
+  agent.abortRun();
+  await run;
+  assert.deepEqual(seen, [...STARTED.map((event) => event.type), 'RUN_ERROR']);
+  assert.equal(cancelled, 1);
+  assert.deepEqual(stopped, [{ streamId: 'stream-1' }]);
+  agent.abortRun();
+  assert.equal(stopped.length, 1, 'a run that is over is not stopped again');
+});
+
+test('abortRun() before the ticket arrives opens no stream, and stops the run once the ticket is there', async () => {
+  let release, opened = 0;
+  const stopped = [];
+  const agent = new StreamAgent({ start: () => new Promise((resolve) => { release = resolve; }), stop: (ticket) => stopped.push(ticket), open: () => { opened++; return scripted([]); } });
+  const result = observe(agent);
+  agent.abortRun();
+  assert.deepEqual(await result, { types: ['RUN_ERROR'], ended: 'complete' });
+  assert.deepEqual(stopped, []);
+  release({ streamId: 'stream-1' });
+  await tick();
+  assert.deepEqual(stopped, [{ streamId: 'stream-1' }]);
+  assert.equal(opened, 0);
+});
+
 test('a clone runs like the original', async () => {
   const agent = agentOver([...STARTED, ...FINISHED]);
   const clone = agent.clone();
@@ -146,6 +181,7 @@ test('a clone runs like the original', async () => {
   assert.notEqual(clone, agent);
   await clone.runAgent({});
   assert.equal(lastAssistant(clone), 'It is sunny in Naples.');
+  clone.abortRun();
 });
 
 test('the default open reads IQ frames from the ticket\'s url and parses them as JSON', async (t) => {

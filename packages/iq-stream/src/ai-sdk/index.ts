@@ -43,7 +43,9 @@ export function chatTransport<Ticket = { url: string }>(options: ChatTransportOp
     let told = false;   // the data layer already said how the run ended
     const onAbort = (): void => stop?.(ticket);
     const finished = (): void => signal?.removeEventListener('abort', onAbort);
-    signal?.addEventListener('abort', onAbort, { once: true });
+    // The user may have aborted while `start()` was running: a listener added now would never be called.
+    if (signal?.aborted) onAbort();
+    else signal?.addEventListener('abort', onAbort, { once: true });
     return new ReadableStream<UIMessageChunk>({
       async pull(controller) {
         try {

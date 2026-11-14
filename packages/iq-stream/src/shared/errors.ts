@@ -2,12 +2,13 @@
 
 /** Base class of every error this package raises. Never carries a token, the secret or frame data. */
 export class IQError extends Error {
+  // `declare`: a class field would make each of them an own property, `undefined` when not given.
   /** The stream the error concerns, when there is one. */
-  streamId?: string;
+  declare streamId?: string;
   /** The HTTP status of the server's answer, when there was one. */
-  status?: number;
+  declare status?: number;
   /** The server's error code (`stream_closed`, `frame_too_large`, …), when it gave one. */
-  code?: string;
+  declare code?: string;
 
   constructor(message: string, details: { streamId?: string; status?: number; code?: string; cause?: unknown } = {}) {
     super(message, details.cause === undefined ? undefined : { cause: details.cause });

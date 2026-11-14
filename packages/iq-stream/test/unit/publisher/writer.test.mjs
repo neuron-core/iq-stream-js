@@ -146,6 +146,34 @@ test('a close line lost with its request is sent again', async () => {
   assert.deepEqual(await closing, { status: 200, lastEventId: 1, closed: true, outcome: 'fail', reason: 'publisher' });
 });
 
+test('a close line that arrived when its answer was lost is the publisher\'s own close, not an error', async () => {
+  const { transport, publisher, errors } = setup();
+  const pub = publisher();
+  pub.send('a');
+  const request = await transport.request(0);
+  const closing = pub.close('end');
+  await until(() => request.ended);
+  transport.onPost = () => ({ status: 409, body: { error: 'stream_closed', outcome: 'end' } });
+  request.respond(0);
+  assert.deepEqual(await closing, { status: 409, closed: true, outcome: 'end', error: 'stream_closed' });
+  assert.deepEqual(errors, []);
+  assert.equal(pub.error, undefined);
+  assert.deepEqual(transport.closes, [], 'nothing is closed out of band');
+});
+
+test('a stream that closed otherwise while the close line was on its way is still an error', async () => {
+  const { transport, publisher, errors } = setup();
+  const pub = publisher();
+  const request = await transport.request(0);
+  const closing = pub.close('fail');
+  await until(() => request.ended);
+  transport.onPost = () => ({ status: 409, body: { error: 'stream_closed', outcome: 'fail', reason: 'max_duration' } });
+  request.respond(0);
+  assert.equal((await closing).reason, 'max_duration');
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].code, 'stream_closed');
+});
+
 test('409 publisher_active on the probe is retried with backoff until the old request is let go', async () => {
   const { transport, publisher, errors } = setup();
   const pub = publisher();
@@ -215,6 +243,18 @@ test('503: retried with backoff, then the stream goes on with nothing lost', asy
   second.respond(200, { lastEventId: 2, closed: true, outcome: 'end' });
   assert.equal((await pub.close()).status, 200);
   assert.deepEqual(errors, []);
+});
+
+test('frames sent during an outage do not cut the backoff between probes short', async () => {
+  const { transport, publisher } = setup({ retryBudget: 5 });
+  transport.onOpen = (request) => request.respond(0);
+  transport.onPost = () => ({ status: 503, body: { error: 'unavailable' } });
+  const pub = publisher();
+  const sending = setInterval(() => pub.send('token'), 5);
+  await sleep(700);
+  clearInterval(sending);
+  assert.ok(transport.probes <= 4, `${transport.probes} probes in 700 ms`);   // at 0, 200 and 600 ms
+  pub.abort();
 });
 
 test('503 that lasts: fatal after retryBudget', async () => {
@@ -334,6 +374,12 @@ test('an error says which stream and why, and never carries a token, the secret 
   assert.match(error.message, /frame_too_large/);
   const everything = `${error.message} ${error.stack} ${JSON.stringify(error)}`;
   for (const secret of ['very-private-frame-data', SECRET, request.token]) assert.ok(!everything.includes(secret));
+});
+
+test('an error has the details it was given, and no others', () => {
+  const error = new IQError('message', { status: 503 });
+  assert.equal(error.status, 503);
+  assert.deepEqual(['streamId', 'status', 'code'].filter((key) => Object.hasOwn(error, key)), ['status']);
 });
 
 test('the replay ring is bounded by frames: a gap it cannot bridge closes the stream with fail', async () => {
@@ -770,4 +816,18 @@ test('closeStream() waits for a publisher that is still attached, within retryBu
   const stuck = setup({ retryBudget: 0.3 });
   stuck.transport.onPost = () => ({ status: 409, body: { error: 'publisher_active' } });
   await assert.rejects(stuck.client.closeStream(STREAM), (error) => error.code === 'publisher_active');
+});
+
+test('retryBudget: 0 turns retries off, not the time a close request may take', async () => {
+  const { transport, client, publisher } = setup({ retryBudget: 0 });
+  transport.onPost = () => ({ status: 503, body: { error: 'unavailable' } });
+  await assert.rejects(client.closeStream(STREAM), (error) => error.status === 503);
+  assert.deepEqual(transport.timeouts, [10_000], 'one request, with its full timeout');
+
+  const pub = publisher();
+  transport.onPost = () => closedFail(0);
+  (await transport.request(0)).respond(400, { error: 'bad_request' });
+  assert.equal((await pub.close()).outcome, 'fail');
+  assert.equal(transport.timeouts.length, 2);
+  assert.ok(transport.timeouts[1] > 2_900 && transport.timeouts[1] <= 3_000, 'giving up has its own bound');
 });

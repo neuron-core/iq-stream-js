@@ -68,12 +68,17 @@ export function refusal(streamId: string, what: string, answer: Answer = NO_ANSW
   });
 }
 
-/** A short request holding only a close line, retried while the server says "not now". */
-export async function closeStreamWithin(wire: Wire, streamId: string, outcome: CloseOutcome, budgetMs: number): Promise<Answer> {
-  const deadline = now() + budgetMs;
+/**
+ * A short request holding only a close line, retried while the server says "not now" and `retryMs`
+ * lasts. `retryMs` bounds the retries only; `withinMs` bounds the whole of it, the requests included.
+ */
+export async function closeStreamWithin(wire: Wire, streamId: string, outcome: CloseOutcome, retryMs: number, withinMs = Infinity): Promise<Answer> {
+  const started = now();
+  const deadline = started + withinMs;
+  const retryUntil = Math.min(started + retryMs, deadline);
   for (let tries = 0; ; tries++) {
     const answer = await wire.post(streamId, closeLine(outcome), Math.max(1, Math.min(POST_TIMEOUT_MS, deadline - now())));
-    if (!isRetryable(answer) || now() + backoff(tries) >= deadline) return answer;
+    if (!isRetryable(answer) || now() + backoff(tries) >= retryUntil) return answer;
     await new Promise((resolve) => setTimeout(resolve, backoff(tries)));
   }
 }
@@ -133,6 +138,8 @@ export class StreamPublisher implements Publisher {
   #requests = 0;
   #closing: CloseOutcome | undefined;
   #closeAt = 0;
+  /** The close line has been handed to a request at least once. */
+  #closeSent = false;
   #stopped = false;
   #error: IQError | undefined;
   #request: OpenRequest | undefined;
@@ -233,9 +240,12 @@ export class StreamPublisher implements Publisher {
   }
 
   writable(): WritableStream<string | { data: string; event?: string }> {
-    // Backpressure: a write is done once the writer has taken the line from the queue.
+    // Backpressure: a write is done once the writer has taken the line from the queue. A batch takes the
+    // queue once per request, so there lines wait until half of `queueBytes` does: the batch fills, and a
+    // server that stopped answering slows the producer down before the queue overflows.
+    const full = (): boolean => (this.#settings.batch ? this.#queuedBytes >= this.#settings.queueBytes / 2 : this.#queue.length > 0);
     return writableOf(this, () =>
-      this.#queue.length > 0 && !this.#stopped ? new Promise<void>((resolve) => this.#drains.push(resolve)) : Promise.resolve(),
+      full() && !this.#stopped ? new Promise<void>((resolve) => this.#drains.push(resolve)) : Promise.resolve(),
     );
   }
 
@@ -260,7 +270,7 @@ export class StreamPublisher implements Publisher {
           if (now() + backoff(tries) > failingSince + budget) {
             return this.#giveUp(refusal(this.streamId, 'gave up retrying', answer, answer.status === 0 ? 'unreachable' : undefined), answer, true);
           }
-          await this.#idle(backoff(tries));
+          await this.#pause(backoff(tries));
           if (this.#stopped) return;
         }
         tries++;
@@ -269,7 +279,7 @@ export class StreamPublisher implements Publisher {
       if (this.#stopped) return;
 
       if (isClosed(answer.body)) {
-        if (answer.status === 200) {
+        if (answer.status === 200 || this.#closedHere(answer)) {
           this.#stop();
           return this.#settle(toResult(answer));
         }
@@ -316,6 +326,7 @@ export class StreamPublisher implements Publisher {
       if (this.#queue.length > 0) {
         await write(this.#take());
       } else if (this.#closing !== undefined && now() >= this.#closeAt) {
+        this.#closeSent = true;
         await write(closeLine(this.#closing));
         request.end();
         break;
@@ -350,7 +361,10 @@ export class StreamPublisher implements Publisher {
     const lines = this.#resend;
     this.#resend = [];
     if (this.#queue.length > 0) lines.push(this.#take());
-    if (closeReady()) lines.push(closeLine(this.#closing!));
+    if (closeReady()) {
+      this.#closeSent = true;
+      lines.push(closeLine(this.#closing!));
+    }
     this.#requests++;
     return this.#wire.post(this.streamId, lines.length > 0 ? concat(lines) : EMPTY, POST_TIMEOUT_MS);
   }
@@ -395,8 +409,22 @@ export class StreamPublisher implements Publisher {
     });
   }
 
+  /** Waits for `ms` whatever is sent or closed meanwhile: only `#stop()` ends it early. */
+  async #pause(ms: number): Promise<void> {
+    for (const until = now() + ms; !this.#stopped && now() < until; ) await this.#idle(until - now());
+  }
+
   #wake(): void {
     this.#waiter?.();
+  }
+
+  /**
+   * A `409 stream_closed` that reports the close line this publisher sent, with its outcome: the line
+   * arrived, its answer was lost, and the probe that followed heard of it.
+   */
+  #closedHere({ status, body }: Answer): boolean {
+    return status === 409 && body.error === 'stream_closed' && this.#closeSent && body.outcome === this.#closing
+      && (body.reason === undefined || body.reason === 'publisher');
   }
 
   #drained(): void {
@@ -430,7 +458,7 @@ export class StreamPublisher implements Publisher {
     const result: PublishResult = answer && answer.status !== 0 ? toResult(answer) : { status: 0, closed: false };
     if (error.code !== undefined) result.error = error.code;
     if (!closeIt) return this.#settle(result);
-    closeStreamWithin(this.#wire, this.streamId, 'fail', Math.min(OUT_OF_BAND_MS, this.#settings.retryBudgetMs))
+    closeStreamWithin(this.#wire, this.streamId, 'fail', this.#settings.retryBudgetMs, OUT_OF_BAND_MS)
       .then((closed) => {
         // The result keeps the status and the code of what went wrong, and says how the stream ended.
         const { lastEventId, outcome, reason } = toResult(closed);
