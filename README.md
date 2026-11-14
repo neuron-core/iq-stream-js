@@ -5,8 +5,10 @@ JavaScript packages for the [IQ-Stream server](https://github.com/neuron-core/iq
 | Package | |
 | --- | --- |
 | [`@neuron-core/iq-stream`](packages/iq-stream/README.md) | The publisher for backends, the client for browsers, and bridges to the Vercel AI SDK and AG-UI, in one package |
+| [`@neuron-core/iq-stream-langchain`](packages/iq-stream-langchain/README.md) | Publishes a LangChain or LangGraph.js agent's stream |
+| [`@neuron-core/iq-stream-mastra`](packages/iq-stream-mastra/README.md) | Publishes a Mastra agent's stream, as a route of the Mastra server or from your own code |
 
-Adapters for agent frameworks (LangChain, Mastra) will be added as further packages of this workspace. Each depends on `@neuron-core/iq-stream` and brings its framework as a peer dependency.
+The two adapters are thin layers over the publisher of `@neuron-core/iq-stream`, which is their peer dependency, and each brings its framework as a peer dependency too. A page reads what they publish with the client and the bridges of `@neuron-core/iq-stream`.
 
 ## Development
 
@@ -16,8 +18,10 @@ Node 20.19 or later and Docker.
 npm install
 npm run build
 npm run test:unit         # no network
-npm run test:packaging    # packs the package and builds small applications against it with four bundlers
+npm run test:packaging    # packs the core package and builds small applications against it with four bundlers
 ```
+
+The commands run in every package of the workspace. `npm run build` builds the core first, which the adapters need: they compile and run against its built output. To work on one package, add `-w packages/<name>`.
 
 The integration and browser tests run against two real IQ-Stream servers, one with default settings on port 8080 and one with short timeouts and small limits on port 8081:
 
@@ -61,7 +65,7 @@ Three rules keep the two sides of the package apart, and `test/unit/boundaries.t
 
 ### Releasing
 
-A release publishes `@neuron-core/iq-stream` from `packages/iq-stream`. `prepublishOnly` builds and runs the unit and packaging tests, so a package whose export map would send a browser to the publisher cannot be published.
+Each package is released by itself. For `@neuron-core/iq-stream`, `prepublishOnly` builds and runs the unit and packaging tests, so a package whose export map would send a browser to the publisher cannot be published. An adapter's `prepublishOnly` builds the whole workspace first, since it compiles against the core's built output, and runs its own unit tests. When an adapter needs a newer core, release the core first and raise the adapter's peer range.
 
 Releases go out from GitHub Actions (`.github/workflows/release.yml`) when a tag `<package>@<version>` is pushed:
 
