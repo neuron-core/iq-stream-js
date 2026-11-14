@@ -8,16 +8,14 @@ export function chatBackend({ iq, agentFor, log = console.error }) {
 
   /** POST /chat: starts the run, publishes it in the background and returns what the page subscribes with. */
   async function start({ id: chatId, messages }, scenario) {
+    const input = { messages: await toBaseMessages(messages) };
     const ticket = await iq.ticket();                    // { streamId, token, url, expiresAt }
     const publisher = iq.publisher(ticket.streamId);     // the request to the IQ server opens now
     const run = { streamId: ticket.streamId, controller: new AbortController() };
     running.set(chatId, run);
 
-    const stream = await agentFor(scenario).stream(
-      { messages: await toBaseMessages(messages) },
-      { ...UI_STREAM_OPTIONS, signal: run.controller.signal },
-    );
-    // Not awaited: the page gets its ticket now, and the run is published while it reads.
+    // Neither call is awaited: the page gets its ticket now, and the run is published while it reads.
+    const stream = agentFor(scenario).stream(input, { ...UI_STREAM_OPTIONS, signal: run.controller.signal });
     run.done = publishUIMessages(stream, publisher, {
       onFinish: async (state) => { /* save state.messages for chatId here: it is awaited before the close line */ },
       onError: (error) => log(`chat ${chatId}: ${error.message}`),

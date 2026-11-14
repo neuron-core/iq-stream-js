@@ -31,17 +31,22 @@ export interface PublishStreamOptions<T> {
   onError?: (error: unknown) => void;
 }
 
-/** A `ReadableStream` is async-iterable on Node, but not on every runtime that has one. */
-export function iterate<T>(source: AsyncIterable<T> | ReadableStream<T>): AsyncIterable<T> {
-  if (Symbol.asyncIterator in source) return source;
-  return (async function* () {
-    const reader = (source as ReadableStream<T>).getReader();
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) return;
-      yield value;
-    }
-  })();
+/**
+ * What can be published: an async iterable, a `ReadableStream`, or the promise of one, as `agent.stream()`
+ * returns it. A promise that rejects is a run that failed before its first chunk.
+ */
+export type StreamSource<T> = AsyncIterable<T> | ReadableStream<T> | PromiseLike<AsyncIterable<T> | ReadableStream<T>>;
+
+/** The chunks of a source. A `ReadableStream` is async-iterable on Node, but not on every runtime that has one. */
+export async function* iterate<T>(source: StreamSource<T>): AsyncGenerator<T> {
+  const stream = await source;
+  if (Symbol.asyncIterator in stream) return yield* stream;
+  const reader = (stream as ReadableStream<T>).getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    yield value;
+  }
 }
 
 export const isAbortError = (error: unknown): boolean => (error as { name?: unknown } | null | undefined)?.name === 'AbortError';
@@ -54,7 +59,7 @@ const frameList = (encoded: string | readonly string[] | undefined): readonly st
  * finished, with `fail` when it threw. Never rejects: a failing run is in the result, not thrown.
  */
 export async function publishStream<T>(
-  source: AsyncIterable<T> | ReadableStream<T>,
+  source: StreamSource<T>,
   publisher: IQPublisherLike,
   options: PublishStreamOptions<T> = {},
 ): Promise<PublishResult> {

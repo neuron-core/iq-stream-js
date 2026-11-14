@@ -40,6 +40,17 @@ test('a ReadableStream is read the same way, also where it is not async-iterable
   assert.deepEqual(other.data, ['3', '4']);
 });
 
+test('the promise of a stream is awaited; one that rejects is a run that failed before its first chunk', async () => {
+  const publisher = new RecordingPublisher();
+  assert.deepEqual(await publishStream(Promise.resolve(generate([1, 2])), publisher), { outcome: 'end', frames: 2 });
+  assert.deepEqual(publisher.data, ['1', '2']);
+
+  const refused = new Error('invalid input');
+  const failing = new RecordingPublisher();
+  assert.deepEqual(await publishStream(Promise.reject(refused), failing), { outcome: 'fail', error: refused, frames: 0 });
+  assert.equal(failing.outcome, 'fail');
+});
+
 test('encode may return no frame, one, or several', async () => {
   const publisher = new RecordingPublisher();
   const encode = (chunk) => (chunk === 'skip' ? undefined : chunk === 'twice' ? ['a', 'b'] : chunk === 'none' ? [] : chunk);

@@ -5,7 +5,7 @@
 import type { ProtocolEvent } from '@langchain/langgraph';
 import { MASKED_ERROR_TEXT, fitting, limitsOf, utf8Length } from '../frames.js';
 import { publishStream } from '../publish-stream.js';
-import type { IQPublisherLike, PublishResult, PublishStreamOptions } from '../publish-stream.js';
+import type { IQPublisherLike, PublishResult, PublishStreamOptions, StreamSource } from '../publish-stream.js';
 
 export interface PublishProtocolEventsOptions {
   /** Protocol channels to publish: `messages`, `tools`, `lifecycle`, `values`, … (`custom` covers `custom:<name>`). Default: all. */
@@ -36,11 +36,11 @@ function masked(event: ProtocolEvent): ProtocolEvent {
 }
 
 /**
- * Publishes what `agent.streamEvents(input, { version: 'v3' })` resolved to and closes the IQ stream
- * when the run ends: with `end`, or with `fail` when the run threw. Never rejects.
+ * Publishes what `agent.streamEvents(input, { version: 'v3' })` returns (the run or its promise) and
+ * closes the IQ stream when the run ends: with `end`, or with `fail` when the run threw. Never rejects.
  */
 export function publishProtocolEvents(
-  run: AsyncIterable<ProtocolEvent>,
+  run: StreamSource<ProtocolEvent>,
   publisher: IQPublisherLike,
   options: PublishProtocolEventsOptions = {},
 ): Promise<PublishResult> {

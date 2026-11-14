@@ -7,7 +7,7 @@ import type { UIMessageChunk } from 'ai';
 import { MASKED_ERROR_TEXT, fitting, limitsOf, splitText, truncationMarker, utf8Length } from '../frames.js';
 import type { FrameLimits } from '../frames.js';
 import { isAbortError, iterate, publishStream } from '../publish-stream.js';
-import type { IQPublisherLike, PublishResult } from '../publish-stream.js';
+import type { IQPublisherLike, PublishResult, StreamSource } from '../publish-stream.js';
 import { StreamOptionsError, firstChunkProblem } from './guard.js';
 
 /**
@@ -87,12 +87,13 @@ export function uiMessageFrames(options: UIMessageFramesOptions = {}): Transform
 }
 
 /**
- * Publishes what `agent.stream(input, UI_STREAM_OPTIONS)` or `graph.stream(...)` returned, converted by
- * `toUIMessageStream`, and closes the IQ stream: with `end` after `onFinish`, with `fail` when the run
- * threw. Never rejects, and reads the run to its end whatever happens to the publisher.
+ * Publishes what `agent.stream(input, UI_STREAM_OPTIONS)` or `graph.stream(...)` returns (the stream or
+ * its promise), converted by `toUIMessageStream`, and closes the IQ stream: with `end` after `onFinish`,
+ * with `fail` when the run threw. Never rejects, and reads the run to its end whatever happens to the
+ * publisher.
  */
 export function publishUIMessages<TState = unknown>(
-  stream: AsyncIterable<unknown> | ReadableStream<unknown>,
+  stream: StreamSource<unknown>,
   publisher: IQPublisherLike,
   options: PublishUIMessagesOptions<TState> = {},
 ): Promise<PublishResult> {
@@ -119,10 +120,10 @@ export function publishUIMessages<TState = unknown>(
   // abort), and checks the first chunk. A stream that fails the check is left alone, not cancelled:
   // cancelling it would stop the run.
   async function* source(): AsyncGenerator<unknown> {
-    const chunks = iterate(stream)[Symbol.asyncIterator]();
+    const raw = iterate(stream);
     try {
       for (let first = true; ; first = false) {
-        const { done, value } = await chunks.next();
+        const { done, value } = await raw.next();
         if (done) return;
         const problem = first ? firstChunkProblem(value) : undefined;
         if (problem !== undefined) throw new StreamOptionsError(problem);

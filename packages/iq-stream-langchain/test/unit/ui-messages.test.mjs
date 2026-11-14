@@ -140,6 +140,15 @@ test('7 wrong stream options: a configuration error to onError, close(fail), and
   }
 });
 
+test('7c a stream that fails the check is not cancelled: the run goes on by itself', async () => {
+  let toolRan = false;
+  const { result } = await run({ tool: async () => { await sleep(300); toolRan = true; return 'ok'; } }, { stream: { streamMode: 'messages' } });
+  assert.equal(result.error.name, 'StreamOptionsError');
+  assert.equal(toolRan, false, 'the adapter answered at the first chunk');
+  for (const deadline = Date.now() + 2000; !toolRan && Date.now() < deadline;) await sleep(10);
+  assert.equal(toolRan, true);
+});
+
 test('7b the option sets the converter reads pass the check', async () => {
   for (const stream of [{ streamMode: ['values', 'messages'] }, { ...UI_STREAM_OPTIONS, subgraphs: true }]) {
     const { publisher, types, errors } = await run({}, { stream });
@@ -243,6 +252,22 @@ test('a model stream, without a graph, is published as well', async () => {
   assert.deepEqual(publisher.data.map((data) => JSON.parse(data).type), ['start', 'text-start', 'text-delta', 'text-delta', 'text-end', 'finish']);
   assert.deepEqual(result, { outcome: 'end', frames: 6 });
   assert.equal(state, undefined);
+});
+
+test('agent.stream() may be passed without awaiting it; if it rejects, the stream closes with fail', async () => {
+  const publisher = new RecordingPublisher();
+  const result = await publishUIMessages(buildAgent().stream(input, UI_STREAM_OPTIONS), publisher);
+  assert.deepEqual(publisher.data.map((data) => JSON.parse(data).type), HAPPY);
+  assert.deepEqual(result, { outcome: 'end', frames: HAPPY.length });
+
+  const refused = new Error('invalid input');
+  const failing = new RecordingPublisher();
+  const errors = [];
+  const failed = await publishUIMessages(Promise.reject(refused), failing, { onError: (error) => void errors.push(error) });
+  assert.deepEqual(failing.data, ['{"type":"start"}', '{"type":"error","errorText":"An error occurred."}']);
+  assert.equal(failing.outcome, 'fail');
+  assert.deepEqual(failed, { outcome: 'fail', error: refused, frames: 2 });
+  assert.deepEqual(errors, [refused]);
 });
 
 test('an onError that throws changes nothing', async () => {
