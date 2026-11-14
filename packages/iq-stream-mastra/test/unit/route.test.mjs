@@ -5,21 +5,14 @@ import { MASTRA_RESOURCE_ID_KEY } from '@mastra/core/request-context';
 import { iqChatRoute } from '../../dist/index.js';
 import { chatBody, sleep, types } from '../support/agent.mjs';
 import { recordingClient } from '../support/client.mjs';
-import { mastraApp } from '../support/server.mjs';
+import { mastraApp, resultsByStream } from '../support/server.mjs';
 
-/** The routes on a server, and what `onResult` reported, as promises by stream id. */
+/** The routes on a server; `done(streamId)` resolves with what `onResult` reported for that stream. */
 async function serve(routeOptions = {}, agentOptions = {}, serverConfig = {}) {
   const { iq, publishers } = recordingClient();
-  const results = new Map();
-  const waiting = new Map();
-  const routes = iqChatRoute({
-    path: '/iq/chat/:agentId', iq, version: 'v6',
-    onResult: (result, ticket) => { results.set(ticket.streamId, result); waiting.get(ticket.streamId)?.(result); },
-    ...routeOptions,
-  });
-  const server = await mastraApp(routes, agentOptions, serverConfig);
-  const done = (streamId) => (results.has(streamId) ? Promise.resolve(results.get(streamId)) : new Promise((resolve) => waiting.set(streamId, resolve)));
-  return { ...server, iq, publishers, routes, done };
+  const { onResult, done } = resultsByStream();
+  const routes = iqChatRoute({ path: '/iq/chat/:agentId', iq, version: 'v6', onResult, ...routeOptions });
+  return { ...(await mastraApp(routes, agentOptions, serverConfig)), iq, publishers, done };
 }
 
 test('three routes: start, abort, reconnect; two without reconnect', () => {

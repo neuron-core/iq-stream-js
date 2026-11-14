@@ -16,3 +16,16 @@ export async function mastraApp(apiRoutes, agentOptions = {}, serverConfig = {})
   }));
   return { app, mastra, agent, post: (path, body, init) => request('POST', path, body, init), get: (path, init) => request('GET', path, undefined, init) };
 }
+
+/** Collects what `onResult` reports: `done(streamId)` resolves with the result of that stream's run. */
+export function resultsByStream() {
+  const results = new Map();
+  const waiting = new Map();
+  return {
+    onResult(result, ticket) {
+      results.set(ticket.streamId, result);
+      waiting.get(ticket.streamId)?.(result);
+    },
+    done: (streamId) => (results.has(streamId) ? Promise.resolve(results.get(streamId)) : new Promise((resolve) => waiting.set(streamId, resolve))),
+  };
+}
