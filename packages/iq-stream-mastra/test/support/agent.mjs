@@ -18,14 +18,13 @@ const result = (stream) => ({ rawCall: { rawPrompt: null, rawSettings: {} }, war
 
 /**
  * `fail` breaks the answer after three words, as a provider outage does. `tool: false` answers at once.
- * `pace` is the delay between two chunks of the model, in milliseconds.
+ * `pace` is the delay between two chunks of the model, in milliseconds. The model keeps no state: it
+ * calls the tool until the prompt holds a tool result, so one agent serves any number of runs.
  */
 export function mockModel({ fail = false, tool = true, pace = 5 } = {}) {
-  let call = 0;
   return new MastraLanguageModelV2Mock({
-    doStream: async () => {
-      call++;
-      if (tool && call % 2 === 1) {
+    doStream: async ({ prompt }) => {
+      if (tool && !prompt.some((message) => message.role === 'tool')) {
         return result(simulateReadableStream({
           chunkDelayInMs: pace,
           chunks: [
@@ -74,19 +73,23 @@ export function weatherTool({ toolDelay = 10, output } = {}) {
   });
 }
 
-/**
- * The agent on a Mastra instance of its own, which gives it storage (a suspended run needs it) and keeps
- * Mastra's console logger quiet. `config` is merged into the instance's, for routes.
- */
-export function weatherMastra({ id = 'weather', memory, ...options } = {}, config = {}) {
-  const agent = new Agent({
+export function makeAgent({ id = 'weather', memory, ...options } = {}) {
+  return new Agent({
     id, name: id,
     instructions: 'SECRET SYSTEM PROMPT: you answer weather questions.',
     model: mockModel(options),
     tools: options.tool === false ? {} : { getWeather: weatherTool(options) },
     ...(memory ? { memory } : {}),
   });
-  return { agent, mastra: new Mastra({ agents: { [id]: agent }, storage: new InMemoryStore(), logger: false, ...config }) };
+}
+
+/**
+ * The agent on a Mastra instance of its own, which gives it storage (a suspended run needs it) and keeps
+ * Mastra's console logger quiet. `config` is merged into the instance's, for routes.
+ */
+export function weatherMastra(options = {}, config = {}) {
+  const agent = makeAgent(options);
+  return { agent, mastra: new Mastra({ agents: { [agent.id]: agent }, storage: new InMemoryStore(), logger: false, ...config }) };
 }
 
 export const weatherAgent = (options) => weatherMastra(options).agent;
