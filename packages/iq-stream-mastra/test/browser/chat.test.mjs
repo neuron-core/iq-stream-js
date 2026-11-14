@@ -145,6 +145,18 @@ test('a tool that needs approval: the card, then the answer on a second stream o
   assert.deepEqual([resumed.outcome, resumed.suspended], ['end', false]);
 });
 
+test('a tool result over the frame limit: the page gets the placeholder in onData, and the rest of the answer', { timeout: 60_000 }, async () => {
+  await openChat('verbose');
+  const ticket = await send();
+  await status('ready');
+  assert.deepEqual(await state(), {
+    status: 'ready', error: '', roles: ['user', 'assistant'], tools: ['tool-getWeather:input-available'], texts: [QUESTION, ANSWER],
+  });
+  assert.equal(await page.evaluate(() => document.querySelector('#data').textContent), 'data-iq-omitted:tool-output-available');
+  const result = await backend.done(ticket.streamId);
+  assert.deepEqual([result.outcome, result.framesOmitted], ['end', 1]);
+});
+
 test('no uncaught error in the page, and none reported by the publisher', () => {
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(backend.errors, []);

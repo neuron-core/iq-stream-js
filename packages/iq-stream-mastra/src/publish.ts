@@ -2,7 +2,7 @@ import { toAISdkStream } from '@mastra/ai-sdk';
 import { MastraAgentNetworkStream, WorkflowRunOutput } from '@mastra/core/stream';
 import type { Publisher } from '@neuron-core/iq-stream';
 import { classifyUIChunk } from './classify.js';
-import { pipeToIQ } from './pipe.js';
+import { pipeToIQ, readerOf } from './pipe.js';
 import type { PipeOptions } from './pipe.js';
 import type { ChunkSource, IQTicket, PublishOptions, PublishedRun, UIVersion } from './types.js';
 
@@ -15,12 +15,8 @@ export const maskedError = (): string => 'An error occurred.';
 /** Reads a source to its end and looks at nothing: reading is what makes a Mastra run proceed. */
 async function drain(source: ChunkSource): Promise<void> {
   try {
-    if ('getReader' in source && typeof source.getReader === 'function') {
-      const reader = source.getReader();
-      while (!(await reader.read()).done);
-    } else {
-      for await (const _ of source as AsyncIterable<unknown>);
-    }
+    const reader = readerOf(source);
+    while (!(await reader.read()).done);
   } catch {
     // The run's own failure is the application's to see, where it started the run.
   }

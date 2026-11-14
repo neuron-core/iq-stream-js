@@ -77,6 +77,14 @@ test('an approval answered by an AI SDK 5 front end: resumeData with the run id 
   assert.deepEqual([resumed.outcome, resumed.suspended, publishers[1].outcome], ['end', false, 'end']);
 });
 
+test('as with chatRoute, other fields of the body are execution options and win over defaultOptions', async () => {
+  const { post, publishers, done } = await serve({ defaultOptions: { requireToolApproval: true } });
+  const ticket = await (await post('/iq/chat/weather', chatBody({ requireToolApproval: false }))).json();
+  const result = await done(ticket.streamId);
+  assert.deepEqual([result.outcome, result.suspended], ['end', false]);
+  assert.ok(types(publishers[0]).includes('tool-output-available'));
+});
+
 test('a fixed agent, and the options of handleChatStream', async () => {
   const { post, publishers, done } = await serve({ path: '/support-chat', agent: 'weather', sendReasoning: true }, {});
   const ticket = await (await post('/support-chat', chatBody())).json();
@@ -110,6 +118,17 @@ test('POST <path>/abort cancels the run: an abort frame, then fail', async () =>
   for (const body of [{ streamId: ticket.streamId }, { streamId: 'never-heard-of-this-stream' }, {}]) {
     assert.equal((await post('/iq/chat/weather/abort', body)).status, 404);
   }
+});
+
+test('the run id of the ticket is the run\'s: Mastra\'s own abort route cancels it, from any instance', async () => {
+  const { post, publishers, done } = await serve({}, { pace: 40 });
+  const ticket = await (await post('/iq/chat/weather', chatBody())).json();
+  await sleep(100);
+  const aborted = await post(`/api/agents/weather/runs/${ticket.runId}/abort`, {});
+  assert.deepEqual([aborted.status, await aborted.json()], [200, { aborted: true }]);
+  const result = await done(ticket.streamId);
+  assert.ok(types(publishers[0]).includes('abort'));
+  assert.deepEqual([result.outcome, result.cause], ['fail', 'abort']);
 });
 
 test('GET <path>/:chatId/stream answers a new ticket for the run in flight, then 204', async () => {

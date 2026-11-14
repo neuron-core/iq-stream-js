@@ -8,6 +8,7 @@ import { MockMemory } from '@mastra/core/memory';
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { IQError } from '@neuron-core/iq-stream';
 import { RecordingPublisher } from '@neuron-core/iq-stream/testing';
+import { readUIMessageStream } from 'ai';
 import { z } from 'zod';
 import { publishToIQ } from '../../dist/index.js';
 import { ANSWER, QUESTION, mockModel, types, weatherAgent } from '../support/agent.mjs';
@@ -182,6 +183,12 @@ test('a 100 KB tool result: the placeholder by default, nothing with drop, the m
     { type: 'data-iq-omitted', transient: true, data: { type: 'tool-output-available', toolCallId: 'call-1', bytes: 0 } });
   assert.ok(placeholder.data.bytes > 100_000);
   assert.deepEqual([omitted.result.outcome, omitted.result.framesOmitted, omitted.result.framesSent], ['end', 1, 20]);
+  // The AI SDK keeps a transient part out of the message: the tool part stays without an output.
+  let message;
+  const stream = new ReadableStream({ start(controller) { for (const chunk of chunks(omitted.publisher)) controller.enqueue(chunk); controller.close(); } });
+  for await (const snapshot of readUIMessageStream({ stream })) message = snapshot;
+  assert.deepEqual(message.parts.map((part) => [part.type, part.state]).filter(([type]) => type !== 'step-start'),
+    [['tool-getWeather', 'input-available'], ['text', 'done']]);
 
   const dropped = await run('drop');
   assert.deepEqual(types(dropped.publisher), ['start', 'start-step', ...TOOL.slice(0, 4), ...tail]);

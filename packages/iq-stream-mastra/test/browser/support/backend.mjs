@@ -33,6 +33,7 @@ export async function startBackend() {
     broken: makeAgent({ id: 'broken', pace: 40, fail: true }),
     slow: makeAgent({ id: 'slow', pace: 250 }),
     careful: makeAgent({ id: 'careful', pace: 40 }),
+    verbose: makeAgent({ id: 'verbose', pace: 40, output: { forecast: 'sunny '.repeat(20_000) } }),
   };
   const routes = [
     ...iqChatRoute({ path: '/iq/chat/:agentId', iq, version: 'v6', onResult }),

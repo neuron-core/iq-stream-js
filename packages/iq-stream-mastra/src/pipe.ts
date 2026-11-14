@@ -14,12 +14,13 @@ export interface PipeOptions<T> {
   suspendGraceMs?: number;
 }
 
-interface Reader<T> {
+export interface Reader<T> {
   read(): Promise<{ done?: boolean; value?: T }>;
   cancel(): Promise<unknown>;
 }
 
-function readerOf<T>(source: ChunkSource<T>): Reader<T> {
+/** One way to read both kinds of source. */
+export function readerOf<T>(source: ChunkSource<T>): Reader<T> {
   if ('getReader' in source && typeof source.getReader === 'function') {
     const reader = source.getReader();
     return { read: () => reader.read(), cancel: () => reader.cancel() };

@@ -25,8 +25,11 @@ const transport = chatTransport({
 });
 
 function App() {
+  const [data, setData] = React.useState([]);
   const { messages, sendMessage, stop, status, error, addToolApprovalResponse } = useChat({
     id: chatId, transport, resume: params.has('resume'),
+    // Transient parts come here and nowhere else: the placeholder of a chunk that was too large is one.
+    onData: (part) => setData((seen) => [...seen, `${part.type}:${part.data?.type}`]),
     // An answered approval card sends the messages again: the second leg.
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
   });
@@ -36,6 +39,7 @@ function App() {
       <button id="stop" onClick={() => stop()}>stop</button>
       <p id="status">{status}</p>
       <p id="error">{error ? error.message : ''}</p>
+      <p id="data">{data.join(' ')}</p>
       <div id="messages">{messages.map((message) => (
         <div key={message.id} data-role={message.role}>{message.parts.map((part, index) => {
           if (part.type === 'text') return <span key={index} className="text">{part.text}</span>;
