@@ -7,3 +7,6 @@ dist/
 # output of the packaging tests
 packages/*/test/packaging/.out/
 packages/*/test/.servers.json
+.claude
+.codex
+.kiro
