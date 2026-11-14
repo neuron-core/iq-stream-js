@@ -53,7 +53,7 @@ describe('Next.js', { skip: enabled ? false : 'set IQ_STREAM_TEST_NEXT=1 to run'
 
       test('a client component that imports the publisher is told so, in a real browser', async () => {
         const { chromium } = await import('playwright');
-        const browser = await chromium.launch();
+        const browser = await chromium.launch(process.env.IQ_STREAM_TEST_CHROMIUM ? { executablePath: process.env.IQ_STREAM_TEST_CHROMIUM } : {});
         try {
           const page = await browser.newPage();
           await page.goto(`http://127.0.0.1:${PORT}/misuse`);

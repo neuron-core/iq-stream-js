@@ -2,14 +2,14 @@
 // Runs the test files under a directory with `node --test`. The runner takes glob patterns only from
 // Node 21 on and directories only before it; a list of files is what every supported version accepts.
 //
-//   node test/run.mjs <directory> [flags for node --test]
+//   node ../../scripts/run-tests.mjs <directory> [flags for node --test]      (from a package's directory)
 import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
 
 const [directory, ...flags] = process.argv.slice(2);
 if (!directory) {
-  console.error('usage: node test/run.mjs <directory> [flags for node --test]');
+  console.error('usage: node scripts/run-tests.mjs <directory> [flags for node --test]');
   process.exit(2);
 }
 const files = readdirSync(directory, { recursive: true })

@@ -16,7 +16,8 @@ export async function startBrowser({ entries = [] } = {}) {
     });
   }
   const backend = await startBackend({ bundles });
-  const browser = await chromium.launch();
+  // IQ_STREAM_TEST_CHROMIUM: a Chromium binary to use in place of the one `playwright install` downloads.
+  const browser = await chromium.launch(process.env.IQ_STREAM_TEST_CHROMIUM ? { executablePath: process.env.IQ_STREAM_TEST_CHROMIUM } : {});
   const page = await browser.newPage();
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
