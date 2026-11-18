@@ -184,7 +184,7 @@ Every publish function and the route take these:
 - **Cancelling is explicit.** A page that stops listening does not stop the run; `POST <path>/abort` does. A tool that is running when the abort arrives finishes first. The route knows the runs of its own process only. With several instances, call Mastra's own `POST /api/agents/:agentId/runs/:runId/abort` with the `runId` of the ticket, which reaches the instance that runs it.
 - **The reconnect route** keeps `chat id → stream` in `mastra.serverCache` while a run is in flight. Mastra's default cache is in memory; with a shared cache the route answers from every instance.
 - **Silence is the core's.** While a tool runs, Mastra emits nothing and the core's keepalives hold the request. Do not send frames as heartbeats.
-- **Limits of the server**: a stream takes 10 MiB and 30 minutes. A run that outlasts them ends for its subscribers with `iq:fail`, and goes on in the backend.
+- **Limits of the server**: a stream takes 10 MiB and one hour. A run that outlasts them ends for its subscribers with `iq:fail`, and goes on in the backend.
 
 ## Requirements
 

@@ -31,8 +31,8 @@ function knows(mastra: Mastra, agentId: string): boolean {
   }
 }
 
-/** A stream lives 30 minutes at most on the server; an entry that is never deleted goes with it. */
-const ACTIVE_RUN_TTL_MS = 35 * 60 * 1000;
+/** A stream lives one hour at most on the server; an entry that is never deleted goes with it. */
+const ACTIVE_RUN_TTL_MS = 65 * 60 * 1000;
 
 /**
  * The chat routes for Mastra's server, to put in `server.apiRoutes`:

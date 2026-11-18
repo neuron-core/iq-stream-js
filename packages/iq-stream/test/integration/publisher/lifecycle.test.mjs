@@ -1,14 +1,11 @@
-// What surrounds a stream: reserving it, a Unix socket, and a server that restarts under a publisher.
+// What surrounds a stream: reserving it, and a server that restarts under a publisher.
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { after, before, beforeEach, test } from 'node:test';
 import { promisify } from 'node:util';
 import * as build from '../../../dist/publisher/node.js';
 import { startServer, subscribe } from '../../../dist/testing/index.js';
-import { containerPort, proxy, serverImage, setup, sleep, until } from './helpers.mjs';
+import { containerPort, serverImage, setup, sleep, until } from './helpers.mjs';
 
 const data = (subscription) => subscription.frames.map((frame) => frame.data);
 
@@ -53,35 +50,6 @@ test('closeStream() tells subscribers at once that a run failed, from a process 
   const received = await subscription;
   assert.deepEqual(received.terminal, { event: 'iq:fail', data: { reason: 'publisher', lastEventId: 0 } });
   assert.ok(Date.now() - started < 1000);
-});
-
-test('a unix:/// url publishes over a Unix socket', async () => {
-  // The servers of this suite listen on TCP, so a proxy stands in for a server started with SOCKET=….
-  const directory = await mkdtemp(join(tmpdir(), 'iq-'));
-  const socket = await proxy(servers.default.url, join(directory, 'iq.sock'));
-  try {
-    const iq = client(build, socket.url, { publicUrl: servers.default.url });
-    assert.match(iq.url, /^unix:\/\/\//);
-    const ticket = await iq.ticket();
-    assert.ok(ticket.url.startsWith(`${servers.default.url}/${ticket.streamId}?token=`));
-    const subscription = subscribe(servers.default.url, ticket.streamId, ticket.token);
-    await sleep(150);
-
-    assert.equal((await iq.reserve(ticket.streamId)).status, 200);
-    const pub = iq.publisher(ticket.streamId);
-    pub.send('over');
-    pub.send('a socket', 'token');
-    assert.deepEqual(await pub.close(), { status: 200, lastEventId: 2, closed: true, outcome: 'end' });
-    assert.equal(pub.requests, 1);
-    assert.ok(socket.connections >= 2, 'the requests went through the socket');
-    const received = await subscription;
-    assert.deepEqual(data(received), ['over', 'a socket']);
-    assert.equal(received.terminal.event, 'iq:end');
-    assert.deepEqual(errors, []);
-  } finally {
-    await socket.close();
-    await rm(directory, { recursive: true, force: true });
-  }
 });
 
 /** Runs a script in a process of its own, with `iq` (a client for the short server) and `id` (a new stream) defined. */

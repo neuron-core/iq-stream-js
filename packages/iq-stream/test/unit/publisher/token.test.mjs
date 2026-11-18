@@ -91,6 +91,7 @@ for (const [name, build] of [['node', nodeBuild], ['fetch', fetchBuild]]) {
     assert.throws(() => new build.IQClient({ ...options, url: 'ftp://iq.test' }), IQError);
     assert.throws(() => new build.IQClient({ ...options, url: 'iq.test:8080' }), IQError);
     assert.throws(() => new build.IQClient({ ...options, url: 'http://iq test' }), IQError);
+    assert.throws(() => new build.IQClient({ ...options, url: 'unix:///run/iq/iq.sock' }), IQError);
     assert.throws(() => new build.IQClient({ ...options, keepalive: 0 }), IQError);
     assert.throws(() => new build.IQClient({ ...options, minOpen: -1 }), IQError);
     assert.throws(() => new build.IQClient({ ...options, onError: 'ignore' }), IQError);
@@ -155,11 +156,9 @@ test('fetch build: tokenSync() says where it exists', () => {
   assert.throws(() => new fetchBuild.IQClient(options).tokenSync('sub', STREAM), (error) => error instanceof IQError && /Node build/.test(error.message));
 });
 
-test('a unix socket address: the Node build takes it, the fetch build refuses it', async () => {
-  const unix = { ...options, url: 'unix:///run/iq/iq.sock' };
-  assert.throws(() => new fetchBuild.IQClient(unix), (error) => error instanceof IQError && /Node build/.test(error.message));
-  const client = new nodeBuild.IQClient(unix);
+test('a publicUrl that is not an http(s) address is refused when a ticket is asked for', async () => {
+  const client = new nodeBuild.IQClient({ ...options, publicUrl: 'stream.example.com' });
   await assert.rejects(client.subscribeUrl(STREAM), (error) => error instanceof IQError && /publicUrl/.test(error.message));
-  const withPublic = new nodeBuild.IQClient({ ...unix, publicUrl: 'https://stream.example.com' });
+  const withPublic = new nodeBuild.IQClient({ ...options, publicUrl: 'https://stream.example.com' });
   assert.match(await withPublic.subscribeUrl(STREAM), /^https:\/\/stream\.example\.com\/Q2hhdC1zdHJlYW0tMDAwMQ\?token=/);
 });

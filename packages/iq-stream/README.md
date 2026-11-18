@@ -216,6 +216,6 @@ import { FakeEventSource } from '@neuron-core/iq-stream/client/testing';
 
 ## Limits worth knowing
 
-- A frame is at most 65,536 bytes and a stream at most 10 MiB and 30 minutes, unless the app has limits of its own on the server.
+- A frame is at most 65,536 bytes and a stream at most 10 MiB and one hour, unless the app has limits of its own on the server.
 - A connection that stalls without being reset is noticed only when the queue of unsent frames reaches `queueBytes`, or when `close()` times out.
 - A stream belongs to the publisher that started it: another process cannot continue it after `abort()`.

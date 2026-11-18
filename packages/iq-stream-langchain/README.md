@@ -176,7 +176,7 @@ During a tool call the run emits nothing; the core's keepalive holds the request
 
 ## Limits worth knowing
 
-- A stream is one run. A frame is at most 65,536 bytes and a stream at most 10 MiB and 30 minutes, unless the app has limits of its own on the server. A run that exceeds them is closed by the server with `iq:fail`; the adapter keeps reading it and `onFinish` still runs.
+- A stream is one run. A frame is at most 65,536 bytes and a stream at most 10 MiB and one hour, unless the app has limits of its own on the server. A run that exceeds them is closed by the server with `iq:fail`; the adapter keeps reading it and `onFinish` still runs.
 - An application that only calls `agent.invoke()` has nothing to publish: switch the call to `agent.stream()`.
 - Graphs served by LangGraph Server (`langgraph-api`) are not covered: that server runs the graph and streams it itself.
 - With `subgraphs: true`, `@ai-sdk/langchain` 3.0.172 repeats a tool call's `tool-input-start` and `tool-input-available` after its output, with the same tool call id.

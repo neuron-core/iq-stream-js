@@ -1,4 +1,3 @@
-import { IQError } from '../shared/errors.js';
 import { NO_ANSWER, parseBody } from './transport.js';
 import type { Answer, OpenRequest, Transport } from './transport.js';
 
@@ -10,8 +9,6 @@ const NEWLINE = Uint8Array.of(10);
  * write is raced against the response, and nothing is written once it has settled.
  */
 export function fetchTransport(url: string, fetcher: typeof fetch = (input, init) => fetch(input, init)): Transport {
-  if (!/^https?:\/\//.test(url)) throw new IQError('@neuron-core/iq-stream: a unix:// url needs the Node build; this runtime reaches the server over http(s).');
-
   const send = (streamId: string, token: string, init: RequestInit): Promise<Response> =>
     // Inside a promise, so that a fetch that throws at once is a lost request like any other.
     Promise.resolve().then(() =>

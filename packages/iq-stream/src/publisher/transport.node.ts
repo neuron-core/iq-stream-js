@@ -30,11 +30,10 @@ function answerOf(request: http.ClientRequest, onResponse?: () => void): Promise
  * Each request has a connection of its own (`agent: false`): a stream's request is held for as long as the answer takes.
  */
 export function nodeTransport(url: string): Transport {
-  const socketPath = url.startsWith('unix://') ? url.slice('unix://'.length) : undefined;
   const tls = url.startsWith('https:');
 
-  const start = (streamId: string, token: string, length?: number): http.ClientRequest => {
-    const options: http.RequestOptions = {
+  const start = (streamId: string, token: string, length?: number): http.ClientRequest =>
+    (tls ? https : http).request(`${url}/${streamId}`, {
       method: 'POST',
       agent: false,
       headers: {
@@ -42,10 +41,7 @@ export function nodeTransport(url: string): Transport {
         'Content-Type': 'application/x-ndjson',
         ...(length === undefined ? {} : { 'Content-Length': length }),
       },
-    };
-    if (socketPath !== undefined) return http.request({ ...options, socketPath, path: `/${streamId}` });
-    return (tls ? https : http).request(`${url}/${streamId}`, options);
-  };
+    });
 
   return {
     open(streamId, token): OpenRequest {

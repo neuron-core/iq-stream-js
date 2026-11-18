@@ -56,8 +56,8 @@ export class IQClientCore {
   constructor(options: IQClientOptions, platform: Platform) {
     refuseBrowser();
     const url = (options.url ?? env('IQ_STREAM_URL') ?? '').replace(/\/+$/, '');
-    if (!/^(https?:\/\/[^/]|unix:\/\/\/.)/.test(url) || (url.startsWith('http') && !URL.canParse(url))) {
-      throw new IQError('@neuron-core/iq-stream: set url (or IQ_STREAM_URL) to http(s)://host[:port] or unix:///path/to/iq.sock.');
+    if (!/^https?:\/\/[^/]/.test(url) || !URL.canParse(url)) {
+      throw new IQError('@neuron-core/iq-stream: set url (or IQ_STREAM_URL) to http(s)://host[:port].');
     }
     const appKey = options.appKey ?? env('IQ_STREAM_APP_KEY') ?? '';
     if (!/^[!-~]{1,256}$/.test(appKey)) {

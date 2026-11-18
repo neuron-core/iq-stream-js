@@ -29,10 +29,10 @@ export async function setup() {
 }
 
 /**
- * A TCP proxy in front of a server, listening on a local port or on a Unix socket path. `kill()` drops
- * every connection through it, which is how a test loses a publisher's connection without touching the server.
+ * A TCP proxy in front of a server, listening on a local port. `kill()` drops every connection
+ * through it, which is how a test loses a publisher's connection without touching the server.
  */
-export async function proxy(target, path) {
+export async function proxy(target) {
   const { hostname, port } = new URL(target);
   const pairs = new Set();
   let accepted = 0;
@@ -52,8 +52,7 @@ export async function proxy(target, path) {
   });
   await new Promise((resolve, reject) => {
     server.on('error', reject);
-    if (path) server.listen(path, resolve);
-    else server.listen(0, '127.0.0.1', resolve);
+    server.listen(0, '127.0.0.1', resolve);
   });
   const kill = () => {
     for (const [client, upstream] of pairs) {
@@ -62,7 +61,7 @@ export async function proxy(target, path) {
     }
   };
   return {
-    url: path ? `unix://${path}` : `http://127.0.0.1:${server.address().port}`,
+    url: `http://127.0.0.1:${server.address().port}`,
     /** Connections accepted so far. */
     get connections() {
       return accepted;

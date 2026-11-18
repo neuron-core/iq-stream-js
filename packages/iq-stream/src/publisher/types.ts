@@ -3,7 +3,7 @@ import type { CloseOutcome } from '../shared/protocol.js';
 
 /** Durations are in seconds unless a name ends in `Ms`. */
 export interface IQClientOptions {
-  /** How the backend reaches the server: `http(s)://host[:port]`, or `unix:///path/to/iq.sock` (Node build). Default: `IQ_STREAM_URL`. */
+  /** How the backend reaches the server: `http(s)://host[:port]`. Default: `IQ_STREAM_URL`. */
   url?: string;
   /** Default: `IQ_STREAM_APP_KEY`. */
   appKey?: string;
