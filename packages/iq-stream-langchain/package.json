@@ -1,6 +1,6 @@
 {
   "name": "@neuron-core/iq-stream-langchain",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Publish a LangChain JS or LangGraph.js run to an IQ-Stream server, as AI SDK UI message chunks or as LangGraph protocol events",
   "type": "module",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@neuron-core/iq-stream-mastra",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Publish a Mastra agent's answer to browsers through an IQ-Stream server: a chat route for Mastra's server, and the same as plain functions",
   "type": "module",
   "license": "MIT",
