@@ -1,6 +1,6 @@
 {
   "name": "@neuron-core/iq-stream",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Publisher and browser client for the IQ-Stream server: relay an agent's answer to browsers over Server-Sent Events",
   "type": "module",
   "license": "MIT",
