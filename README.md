@@ -1,6 +1,6 @@
 # IQ-Stream for JavaScript
 
-JavaScript and TypeScript packages for the [IQ-Stream server](https://github.com/neuron-core/iq-stream).
+JavaScript and TypeScript packages for the [IQ-Stream server](https://iq-stream.dev).
 
 IQ-Stream relays an AI agent's answer from your backend to the browsers that are waiting for it, over Server-Sent Events. Your backend runs the agent and sends each chunk of the answer to the IQ-Stream server. Browsers subscribe to the stream with a short-lived token and receive the chunks as they arrive. If a page reloads or the connection drops, the browser picks up where it left off. The agent run never depends on the browser connection staying open.
 
