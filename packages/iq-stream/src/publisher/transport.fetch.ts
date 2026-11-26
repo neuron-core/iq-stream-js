@@ -1,4 +1,4 @@
-import { NO_ANSWER, parseBody } from './transport.js';
+import { NO_ANSWER, parseBody, publishHeaders } from './transport.js';
 import type { Answer, OpenRequest, Transport } from './transport.js';
 
 const NEWLINE = Uint8Array.of(10);
@@ -9,20 +9,14 @@ const NEWLINE = Uint8Array.of(10);
  * write is raced against the response, and nothing is written once it has settled.
  */
 export function fetchTransport(url: string, fetcher: typeof fetch = (input, init) => fetch(input, init)): Transport {
-  const send = (streamId: string, token: string, init: RequestInit): Promise<Response> =>
+  const send = (streamId: string, token: string, continues: number | undefined, init: RequestInit): Promise<Response> =>
     // Inside a promise, so that a fetch that throws at once is a lost request like any other.
-    Promise.resolve().then(() =>
-      fetcher(`${url}/${streamId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/x-ndjson' },
-        ...init,
-      }),
-    );
+    Promise.resolve().then(() => fetcher(`${url}/${streamId}`, { method: 'POST', headers: publishHeaders(token, continues), ...init }));
   const answerOf = (response: Promise<Response>): Promise<Answer> =>
     response.then(async (res) => ({ status: res.status, body: parseBody(await res.text()) })).catch(() => NO_ANSWER);
 
   return {
-    open(streamId, token): OpenRequest {
+    open(streamId, token, continues): OpenRequest {
       const abort = new AbortController();
       const body = new TransformStream<Uint8Array, Uint8Array>();
       const writer = body.writable.getWriter();
@@ -33,7 +27,7 @@ export function fetchTransport(url: string, fetcher: typeof fetch = (input, init
         settled = true;
         pending?.();
       };
-      const response = send(streamId, token, { body: body.readable, duplex: 'half', signal: abort.signal } as RequestInit);
+      const response = send(streamId, token, continues, { body: body.readable, duplex: 'half', signal: abort.signal } as RequestInit);
       response.then(settle, settle);
       // fetch may hold the head back until the body has its first chunk (Node's does). An empty line is a
       // keepalive to the server, and makes the request open now: a subscriber may be waiting for its publisher.
@@ -59,10 +53,10 @@ export function fetchTransport(url: string, fetcher: typeof fetch = (input, init
       };
     },
 
-    post(streamId, token, body, timeoutMs): Promise<Answer> {
+    post(streamId, token, body, timeoutMs, continues): Promise<Answer> {
       const abort = new AbortController();
       const timer = setTimeout(() => abort.abort(), timeoutMs);
-      return answerOf(send(streamId, token, { body: body as BodyInit, signal: abort.signal })).finally(() => clearTimeout(timer));
+      return answerOf(send(streamId, token, continues, { body: body as BodyInit, signal: abort.signal })).finally(() => clearTimeout(timer));
     },
   };
 }

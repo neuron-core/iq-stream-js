@@ -1,6 +1,6 @@
 import http from 'node:http';
 import https from 'node:https';
-import { NO_ANSWER, parseBody } from './transport.js';
+import { NO_ANSWER, parseBody, publishHeaders } from './transport.js';
 import type { Answer, OpenRequest, Transport } from './transport.js';
 
 const CONNECT_TIMEOUT_MS = 5_000;
@@ -32,20 +32,16 @@ function answerOf(request: http.ClientRequest, onResponse?: () => void): Promise
 export function nodeTransport(url: string): Transport {
   const tls = url.startsWith('https:');
 
-  const start = (streamId: string, token: string, length?: number): http.ClientRequest =>
+  const start = (streamId: string, token: string, continues: number | undefined, length?: number): http.ClientRequest =>
     (tls ? https : http).request(`${url}/${streamId}`, {
       method: 'POST',
       agent: false,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/x-ndjson',
-        ...(length === undefined ? {} : { 'Content-Length': length }),
-      },
+      headers: { ...publishHeaders(token, continues), ...(length === undefined ? {} : { 'Content-Length': length }) },
     });
 
   return {
-    open(streamId, token): OpenRequest {
-      const request = start(streamId, token);
+    open(streamId, token, continues): OpenRequest {
+      const request = start(streamId, token, continues);
       let settled = false;
       let pending: (() => void) | undefined;
       const connecting = setTimeout(() => request.destroy(), CONNECT_TIMEOUT_MS);
@@ -88,8 +84,8 @@ export function nodeTransport(url: string): Transport {
       };
     },
 
-    post(streamId, token, body, timeoutMs): Promise<Answer> {
-      const request = start(streamId, token, body.length);
+    post(streamId, token, body, timeoutMs, continues): Promise<Answer> {
+      const request = start(streamId, token, continues, body.length);
       const timer = setTimeout(() => request.destroy(), timeoutMs);
       const answer = answerOf(request).then((result) => {
         clearTimeout(timer);

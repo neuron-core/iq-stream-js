@@ -98,8 +98,9 @@ export class IQClientCore {
     const transport = platform.transport(url, options);
     // A fresh `pub` token for every request, never handed to application code.
     this.#wire = {
-      open: async (streamId) => transport.open(streamId, await this.#mint('pub', streamId, PUB_TOKEN_TTL)),
-      post: async (streamId, body, timeoutMs) => transport.post(streamId, await this.#mint('pub', streamId, PUB_TOKEN_TTL), body, timeoutMs),
+      open: async (streamId, continues) => transport.open(streamId, await this.#mint('pub', streamId, PUB_TOKEN_TTL), continues),
+      post: async (streamId, body, timeoutMs, continues) =>
+        transport.post(streamId, await this.#mint('pub', streamId, PUB_TOKEN_TTL), body, timeoutMs, continues),
     };
   }
 

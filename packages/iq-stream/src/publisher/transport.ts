@@ -25,11 +25,25 @@ export interface OpenRequest {
   destroy(): void;
 }
 
+/**
+ * `continues` is the `lastEventId` of the server's last answer for the stream, sent as `Last-Event-ID` by a
+ * request that continues it: a server that does not hold that stream refuses it with `409 stream_unknown`,
+ * where without the header it would open a new one. Undefined for a request that may open the stream.
+ */
 export interface Transport {
   /** Opens a chunked `POST` and sends its head at once. */
-  open(streamId: string, token: string): OpenRequest;
+  open(streamId: string, token: string, continues?: number): OpenRequest;
   /** A short `POST` with its whole body: the probe, the out-of-band close, a batch. Never rejects. */
-  post(streamId: string, token: string, body: Uint8Array, timeoutMs: number): Promise<Answer>;
+  post(streamId: string, token: string, body: Uint8Array, timeoutMs: number, continues?: number): Promise<Answer>;
+}
+
+/** The headers of a publish request. */
+export function publishHeaders(token: string, continues: number | undefined): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/x-ndjson',
+    ...(continues === undefined ? {} : { 'Last-Event-ID': String(continues) }),
+  };
 }
 
 export function parseBody(text: string): Record<string, unknown> {

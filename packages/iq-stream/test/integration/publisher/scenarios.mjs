@@ -176,6 +176,35 @@ export function scenarios(name, build) {
     }
   });
 
+  test(`${name}: a stream whose id comes to lead to a server that does not hold it is given up there, and nothing is opened or closed`, async () => {
+    const route = await proxy(servers.short.url);
+    try {
+      const iq = client(build, route.url, { keepalive: null });
+      const { id, subscription } = await listen(iq, servers.short);
+      const pub = iq.publisher(id);
+      pub.send('a');
+      // The 408 after the read timeout says the stream holds 1 frame; the request that continues it says so too.
+      // Its connection, not only the request, must have reached the proxy before the route changes.
+      await until(() => pub.requests === 2 && route.connections === 2, 'the request to be reopened after the 408', 4000);
+      route.retarget(servers.default.url);
+      await until(() => !pub.alive, 'the publisher to give up at the next 408', 5000);
+      assert.equal(pub.error.code, 'stream_unknown');
+      assert.equal(pub.error.status, 409);
+      assert.deepEqual(errors, [pub.error]);
+      assert.deepEqual(await pub.close(), { status: 409, closed: false, error: 'stream_unknown' });
+      assert.equal(pub.requests, 3);
+
+      const elsewhere = await subscribe(servers.default.url, id, await iq.token('sub', id), { timeout: 1 });
+      assert.deepEqual(elsewhere.frames, [], 'no stream was opened there');
+      assert.equal(elsewhere.terminal, undefined, 'nor closed: the subscriber waits for a publisher');
+      const received = await subscription;
+      assert.deepEqual(data(received), ['a']);
+      assert.deepEqual(received.terminal, { event: 'iq:fail', data: { reason: 'publisher_idle', lastEventId: 1 } });
+    } finally {
+      await route.close();
+    }
+  });
+
   test(`${name} T8: a run that closes at once is gone for a browser that arrives 400 ms later; minOpen keeps it`, async () => {
     const run = async (minOpen) => {
       const iq = client(build, servers.default.url, { minOpen });

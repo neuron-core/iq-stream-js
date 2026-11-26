@@ -29,9 +29,11 @@ export class FakeRequest {
   #pending = [];
   answer = new Promise((resolve) => (this.#resolve = resolve));
 
-  constructor(streamId, token) {
+  constructor(streamId, token, continues) {
     this.streamId = streamId;
     this.token = token;
+    /** The `Last-Event-ID` the request was opened with: undefined when it may open the stream. */
+    this.continues = continues;
   }
 
   write(bytes) {
@@ -85,6 +87,8 @@ export class FakeTransport {
   posts = [];
   /** The timeout each short request was given, in milliseconds. */
   timeouts = [];
+  /** The `Last-Event-ID` each short request was sent with: undefined when it may open the stream. */
+  continued = [];
   /** Called with each request as it opens, to answer it at once. */
   onOpen = undefined;
   /** Answers each short request. By default the stream is empty and open, and a close line is accepted. */
@@ -93,17 +97,18 @@ export class FakeTransport {
       ? { status: 200, body: { lastEventId: 0, closed: true, outcome: 'fail', reason: 'publisher' } }
       : { status: 200, body: { lastEventId: 0, closed: false } };
 
-  open(streamId, token) {
-    const request = new FakeRequest(streamId, token);
+  open(streamId, token, continues) {
+    const request = new FakeRequest(streamId, token, continues);
     this.requests.push(request);
     this.onOpen?.(request, this.requests.length - 1);
     return request;
   }
 
-  async post(streamId, token, body, timeoutMs) {
+  async post(streamId, token, body, timeoutMs, continues) {
     const text = decoder.decode(body);
     this.posts.push(text);
     this.timeouts.push(timeoutMs);
+    this.continued.push(continues);
     return this.onPost(text, this.posts.length - 1);
   }
 

@@ -21,10 +21,10 @@ export interface Settings {
   takeoverBudgetMs: number;
 }
 
-/** The transport with the stream's `pub` token already minted for each request. */
+/** The transport with the stream's `pub` token already minted for each request. `continues` as in `Transport`. */
 export interface Wire {
-  open(streamId: string): Promise<OpenRequest>;
-  post(streamId: string, body: Uint8Array, timeoutMs: number): Promise<Answer>;
+  open(streamId: string, continues?: number): Promise<OpenRequest>;
+  post(streamId: string, body: Uint8Array, timeoutMs: number, continues?: number): Promise<Answer>;
 }
 
 export const POST_TIMEOUT_MS = 10_000;
@@ -71,13 +71,21 @@ export function refusal(streamId: string, what: string, answer: Answer = NO_ANSW
 /**
  * A short request holding only a close line, retried while the server says "not now" and `retryMs`
  * lasts. `retryMs` bounds the retries only; `withinMs` bounds the whole of it, the requests included.
+ * `continues` is the publisher's, when it closes a stream it was answered for.
  */
-export async function closeStreamWithin(wire: Wire, streamId: string, outcome: CloseOutcome, retryMs: number, withinMs = Infinity): Promise<Answer> {
+export async function closeStreamWithin(
+  wire: Wire,
+  streamId: string,
+  outcome: CloseOutcome,
+  retryMs: number,
+  withinMs = Infinity,
+  continues?: number,
+): Promise<Answer> {
   const started = now();
   const deadline = started + withinMs;
   const retryUntil = Math.min(started + retryMs, deadline);
   for (let tries = 0; ; tries++) {
-    const answer = await wire.post(streamId, closeLine(outcome), Math.max(1, Math.min(POST_TIMEOUT_MS, deadline - now())));
+    const answer = await wire.post(streamId, closeLine(outcome), Math.max(1, Math.min(POST_TIMEOUT_MS, deadline - now())), continues);
     if (!isRetryable(answer) || now() + backoff(tries) >= retryUntil) return answer;
     await new Promise((resolve) => setTimeout(resolve, backoff(tries)));
   }
@@ -132,6 +140,12 @@ export class StreamPublisher implements Publisher {
   #written = 0;
   /** Frames the server does not hold, to send first on the next request. */
   #resend: Uint8Array[] = [];
+  /**
+   * The `lastEventId` of the server's last answer for this stream. Every request after it sends it back as
+   * `Last-Event-ID`, so that a server that does not hold the stream (its id now leads elsewhere, or the
+   * server restarted) refuses the request rather than open the stream again, counted from 1.
+   */
+  #answeredFrames: number | undefined;
 
   #framesSent = 0;
   #bytesSent = 0;
@@ -254,7 +268,7 @@ export class StreamPublisher implements Publisher {
     let tries = 0;
     while (!this.#stopped) {
       const started = now();
-      let answer = usable(await (this.#settings.batch ? this.#batch() : this.#stream()));
+      let answer = this.#heard(await (this.#settings.batch ? this.#batch() : this.#stream()));
       if (!isRetryable(answer) || now() - started > HEALTHY_MS) {
         failingSince = undefined;
         tries = 0;
@@ -274,7 +288,7 @@ export class StreamPublisher implements Publisher {
           if (this.#stopped) return;
         }
         tries++;
-        answer = usable(await this.#wire.post(this.streamId, EMPTY, POST_TIMEOUT_MS));
+        answer = this.#heard(await this.#wire.post(this.streamId, EMPTY, POST_TIMEOUT_MS, this.#answeredFrames));
       }
       if (this.#stopped) return;
 
@@ -284,6 +298,11 @@ export class StreamPublisher implements Publisher {
           return this.#settle(toResult(answer));
         }
         return this.#giveUp(refusal(this.streamId, 'the stream is closed', answer), answer, false);
+      }
+      if (answer.status === 409 && answer.body.error === 'stream_unknown') {
+        // The server does not hold the stream: its id now leads to another server, or this one lost it in a
+        // restart. Its subscribers end where they are, with iq:fail or iq:gone, and there is nothing to close here.
+        return this.#giveUp(refusal(this.streamId, 'the server does not hold the stream', answer), answer, false);
       }
       if (answer.status === 200 || answer.status === 408) {
         if (this.#resume(answer.body.lastEventId as number)) continue;
@@ -299,7 +318,7 @@ export class StreamPublisher implements Publisher {
 
   /** One held request: pending resends, then the queue as it fills, keepalives, the close line. Returns its answer. */
   async #stream(): Promise<Answer> {
-    const request = await this.#wire.open(this.streamId);
+    const request = await this.#wire.open(this.streamId, this.#answeredFrames);
     this.#requests++;
     if (this.#stopped) {
       request.destroy();
@@ -366,7 +385,13 @@ export class StreamPublisher implements Publisher {
       lines.push(closeLine(this.#closing!));
     }
     this.#requests++;
-    return this.#wire.post(this.streamId, lines.length > 0 ? concat(lines) : EMPTY, POST_TIMEOUT_MS);
+    return this.#wire.post(this.streamId, lines.length > 0 ? concat(lines) : EMPTY, POST_TIMEOUT_MS, this.#answeredFrames);
+  }
+
+  /** Takes note of what an answer says the stream holds, for the requests that continue it, and makes it `usable`. */
+  #heard(answer: Answer): Answer {
+    if (typeof answer.body.lastEventId === 'number') this.#answeredFrames = answer.body.lastEventId;
+    return usable(answer);
   }
 
   /** Moves the queue into the replay ring and returns it as one chunk: lines queued together leave together. */
@@ -458,7 +483,7 @@ export class StreamPublisher implements Publisher {
     const result: PublishResult = answer && answer.status !== 0 ? toResult(answer) : { status: 0, closed: false };
     if (error.code !== undefined) result.error = error.code;
     if (!closeIt) return this.#settle(result);
-    closeStreamWithin(this.#wire, this.streamId, 'fail', this.#settings.retryBudgetMs, OUT_OF_BAND_MS)
+    closeStreamWithin(this.#wire, this.streamId, 'fail', this.#settings.retryBudgetMs, OUT_OF_BAND_MS, this.#answeredFrames)
       .then((closed) => {
         // The result keeps the status and the code of what went wrong, and says how the stream ended.
         const { lastEventId, outcome, reason } = toResult(closed);

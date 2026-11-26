@@ -65,6 +65,7 @@ test('408 read_timeout: the writer reopens and resumes from lastEventId, without
   assert.equal((await closing).lastEventId, 5);
   assert.equal(pub.requests, 3);
   assert.equal(transport.probes, 0);
+  assert.deepEqual([first.continues, second.continues, third.continues], [undefined, 2, 5], 'each request continues from the last answer');
   assert.deepEqual(errors, []);
 });
 
@@ -87,6 +88,8 @@ test('a lost connection: the writer probes with an empty POST and resends what t
   assert.deepEqual(second.data, ['f4', 'f5', 'f6', 'f7']);
   second.respond(200, { lastEventId: 7, closed: true, outcome: 'end' });
   assert.deepEqual(await closing, { status: 200, lastEventId: 7, closed: true, outcome: 'end' });
+  assert.deepEqual(transport.continued, [undefined], 'the probe of a stream never answered may open it');
+  assert.equal(second.continues, 3);
   assert.deepEqual(errors, []);
 });
 
@@ -312,6 +315,28 @@ test('409 stream_closed: fatal, and there is nothing to close', async () => {
   assert.equal(pub.requests, 1);
 });
 
+test('409 stream_unknown: the server does not hold the stream it was answered for; fatal, and there is nothing to close', async () => {
+  const { transport, publisher, errors } = setup();
+  const pub = publisher();
+  pub.send('a');
+  const first = await transport.request(0);
+  await until(() => first.data.length === 1);
+  first.respond(408, { lastEventId: 1, closed: false, error: 'read_timeout' });
+  pub.send('b');
+  const second = await transport.request(1);
+  assert.equal(second.continues, 1);
+  second.respond(409, { error: 'stream_unknown' });
+  await until(() => !pub.alive);
+  assert.equal(pub.send('c'), false);
+  assert.deepEqual(await pub.close(), { status: 409, closed: false, error: 'stream_unknown' });
+  assert.deepEqual(transport.posts, [], 'no close line, which would open a stream where it is not');
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].code, 'stream_unknown');
+  assert.equal(errors[0].status, 409);
+  assert.match(errors[0].message, /does not hold the stream/);
+  assert.equal(pub.requests, 2);
+});
+
 test('413 stream_too_large: the server closed the stream; fatal, nothing to close', async () => {
   const { transport, publisher, errors } = setup();
   const pub = publisher();
@@ -336,6 +361,7 @@ for (const [status, error] of [[413, 'frame_too_large'], [400, 'invalid_frame']]
     assert.equal(pub.send('after'), false);
     assert.deepEqual(await pub.close('end'), { status, lastEventId: 1, closed: true, outcome: 'fail', reason: 'publisher', error });
     assert.deepEqual(transport.posts, ['{"close":"fail"}\n']);
+    assert.deepEqual(transport.continued, [1], 'the close continues the stream the answer was about');
     assert.equal(request.destroyed, true);
     assert.equal(errors.length, 1);
     assert.equal(errors[0].code, error);
@@ -747,6 +773,7 @@ test('batch mode: the stream is reserved at once, lines are collected into short
   assert.equal(transport.posts[2], '{"event":"token","data":"d"}\n{"close":"end"}\n');
   assert.deepEqual(result, { status: 200, lastEventId: 4, closed: true, outcome: 'end' });
   assert.equal(pub.requests, 3);
+  assert.deepEqual(transport.continued, [undefined, 0, 3], 'every request after the first continues from the last answer');
   assert.equal(transport.requests.length, 0, 'no held request');
   assert.deepEqual(errors, []);
 });
@@ -762,6 +789,7 @@ test('batch mode: a request whose answer was lost is probed, and what the server
   await until(() => transport.posts.length === 4);
   assert.deepEqual(transport.posts, ['', '{"data":"a"}\n{"data":"b"}\n{"data":"c"}\n', '', '{"data":"b"}\n{"data":"c"}\n']);
   assert.deepEqual(await pub.close(), { status: 200, lastEventId: 3, closed: true, outcome: 'end' });
+  assert.deepEqual(transport.continued, [undefined, 0, 0, 1, 3], 'a lost answer leaves the last one heard');
   assert.deepEqual(errors, []);
 });
 

@@ -30,10 +30,12 @@ export async function setup() {
 
 /**
  * A TCP proxy in front of a server, listening on a local port. `kill()` drops every connection
- * through it, which is how a test loses a publisher's connection without touching the server.
+ * through it, which is how a test loses a publisher's connection without touching the server;
+ * `retarget()` sends the connections that follow to another server, as when a stream's id comes to
+ * lead elsewhere.
  */
 export async function proxy(target) {
-  const { hostname, port } = new URL(target);
+  let { hostname, port } = new URL(target);
   const pairs = new Set();
   let accepted = 0;
   const server = net.createServer((client) => {
@@ -67,6 +69,9 @@ export async function proxy(target) {
       return accepted;
     },
     kill,
+    retarget: (url) => {
+      ({ hostname, port } = new URL(url));
+    },
     close: () => {
       kill();
       return new Promise((resolve) => server.close(resolve));
